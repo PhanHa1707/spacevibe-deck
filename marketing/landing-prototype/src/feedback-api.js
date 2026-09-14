@@ -11,6 +11,7 @@ export const FEEDBACK_STATUSES = ["pending", "review", "done"];
 
 export const FEEDBACK_CATEGORIES = ["bug", "idea", "other"];
 
+export const TITLE_MIN = 3;
 export const TITLE_MAX = 120;
 export const BODY_MAX = 2000;
 
