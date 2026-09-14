@@ -35,7 +35,24 @@ describe("groupFeedbackBoard", () => {
 });
 
 describe("submitFeedback", () => {
-  const input = { title: "Split panes", body: "", category: "idea", website: "" };
+  const input = { title: "Split panes", body: "", category: "idea", website: "", id: "" };
+
+  it("names the draft's id when it has one, with a timeout on the request", async () => {
+    const sent = [];
+    const capture = async (_url, init) => {
+      sent.push({ body: JSON.parse(init.body), signal: init.signal });
+      return new Response(null, { status: 204 });
+    };
+    const id = "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed";
+
+    await submitFeedback({ ...input, id }, capture);
+    await submitFeedback(input, capture);
+
+    expect(sent[0].body.id).toBe(id);
+    expect("id" in sent[1].body).toBe(false);
+    expect(sent[0].signal).toBeInstanceOf(AbortSignal);
+  });
+
   const respond = (status) => async () => new Response(null, { status });
 
   it("maps the Worker's status codes to a reason", async () => {

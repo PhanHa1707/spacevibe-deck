@@ -30,18 +30,30 @@ describe("feedback draft", () => {
     const storage = memoryStorage();
     const now = new Date("2026-09-14T10:00:00.000Z");
 
-    expect(writeDraft(storage, { title: "Pin agents", body: "", category: "idea" }, now)).toBe(
-      "saved",
-    );
+    const id = "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed";
+
+    expect(
+      writeDraft(storage, { title: "Pin agents", body: "", category: "idea", id }, now),
+    ).toBe("saved");
     expect(readDraft(storage)).toEqual({
       title: "Pin agents",
       body: "",
       category: "idea",
+      id,
       savedAt: "2026-09-14T10:00:00.000Z",
     });
 
     expect(writeDraft(storage, { title: " ", body: "", category: "idea" })).toBe("empty");
     expect(storage.has(FEEDBACK_DRAFT_KEY)).toBe(false);
+  });
+
+  it("reads a pre-id draft or a malformed id back without one", () => {
+    for (const id of [undefined, "not-a-uuid"]) {
+      const draft = readDraft(
+        memoryStorage({ [FEEDBACK_DRAFT_KEY]: JSON.stringify({ title: "x", body: "", id }) }),
+      );
+      expect(draft?.id).toBe("");
+    }
   });
 
   it("ignores corrupt or foreign values and repairs an unknown category", () => {

@@ -67,10 +67,23 @@ function renderForm(copy) {
         </span>
       </label>
 
-      <!-- Honeypot: hidden from people and assistive tech, filled by bots. -->
+      <!-- Honeypot. display:none keeps it from people and from browser autofill,
+           which skips fields it cannot focus; the odd name, the unknown
+           autocomplete token and the ignore attributes keep password managers
+           off it too. A bot that fills every input still writes into it. The
+           Worker drops a filled one with a silent 204, so a false positive
+           here loses a real report without trace (DECK-101 review). -->
       <label class="feedback-trap" aria-hidden="true">
-        Website
-        <input name="website" type="text" tabindex="-1" autocomplete="off" />
+        Leave empty
+        <input
+          name="deck-hp-note"
+          type="text"
+          tabindex="-1"
+          autocomplete="new-hp"
+          data-1p-ignore
+          data-lpignore="true"
+          data-bwignore
+        />
       </label>
 
       <p class="feedback-notice" data-copy="feedbackNotice">${copy.feedbackNotice}</p>
@@ -154,6 +167,12 @@ export function setComposerState(root, state, copyKey, copy) {
   form.hidden = state === "sent";
   sent.hidden = state !== "sent";
   submit.disabled = state === "sending";
+
+  // Text typed while a send is in flight would be wiped by the reset that
+  // follows success, so the fields hold still until the answer arrives.
+  for (const field of form.querySelectorAll('[name="title"], [name="body"]')) {
+    field.readOnly = state === "sending";
+  }
   label.dataset.copy = state === "sending" ? "feedbackSending" : "feedbackSubmit";
   label.textContent = copy[label.dataset.copy];
 

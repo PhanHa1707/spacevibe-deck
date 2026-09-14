@@ -18,6 +18,11 @@ export const FEEDBACK_STATUSES = ["pending", "review", "done"];
 
 export const FEEDBACK_CATEGORIES = ["bug", "idea", "other"];
 
+// The Worker gives Linear 10 s; past these the visitor gets an answer and a
+// kept draft instead of a button stuck on "Sending…".
+const SUBMIT_TIMEOUT_MS = 15_000;
+const BOARD_TIMEOUT_MS = 12_000;
+
 export const TITLE_MIN = 3;
 export const TITLE_MAX = 120;
 export const BODY_MAX = 2000;
@@ -68,7 +73,10 @@ export function groupFeedbackBoard(payload) {
 }
 
 export async function fetchFeedbackBoard(fetchImpl = fetch) {
-  const response = await fetchImpl(FEEDBACK_API_URL, { headers: { accept: "application/json" } });
+  const response = await fetchImpl(FEEDBACK_API_URL, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(BOARD_TIMEOUT_MS),
+  });
 
   if (!response.ok) {
     throw new Error(`Feedback board request failed with ${response.status}.`);
@@ -78,7 +86,10 @@ export async function fetchFeedbackBoard(fetchImpl = fetch) {
 }
 
 /**
- * @param {{ title: string, body: string, category: string, website: string }} input
+ * `id` is the draft's UUID: a resend after a lost answer names the same Linear
+ * issue instead of creating a second one. Omitted when the browser has none.
+ *
+ * @param {{ title: string, body: string, category: string, website: string, id: string }} input
  */
 export async function submitFeedback(input, fetchImpl = fetch) {
   let response;
@@ -92,7 +103,9 @@ export async function submitFeedback(input, fetchImpl = fetch) {
         body: input.body,
         category: input.category,
         website: input.website,
+        ...(input.id ? { id: input.id } : {}),
       }),
+      signal: AbortSignal.timeout(SUBMIT_TIMEOUT_MS),
     });
   } catch {
     throw new FeedbackSubmitError("server");

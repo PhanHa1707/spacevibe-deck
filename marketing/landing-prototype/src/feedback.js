@@ -21,7 +21,7 @@ import {
   renderBoardLoading,
   selectBoardColumn,
 } from "./feedback-board-view.js";
-import { clearDraft, readDraft, writeDraft } from "./feedback-draft.js";
+import { clearDraft, newDraftId, readDraft, writeDraft } from "./feedback-draft.js";
 import {
   fillForm,
   renderDraftStatus,
@@ -56,6 +56,9 @@ if (!root) {
 let api = { fetchBoard: fetchFeedbackBoard, submit: submitFeedback };
 let locale = readLocale(window.location);
 let requestId = 0;
+let sending = false;
+// One id per draft, kept across reloads and resends, replaced after success.
+let draftId = newDraftId();
 
 renderFeedbackShell(root, messages[locale], locale);
 document.documentElement.lang = locale;
@@ -94,7 +97,8 @@ function readForm() {
     title: text("title").replace(/\s+/g, " "),
     body: text("body"),
     category: text("category"),
-    website: text("website"),
+    website: text("deck-hp-note"),
+    id: draftId,
   };
 }
 
@@ -105,13 +109,15 @@ function saveDraft() {
     title: String(data.get("title") ?? ""),
     body: String(data.get("body") ?? ""),
     category: String(data.get("category") ?? ""),
+    id: draftId,
   });
   renderDraftStatus(root, state, messages[locale]);
 }
 
 async function handleSubmit() {
-  // Cmd/Ctrl+Enter calls requestSubmit(), which a disabled button cannot stop.
-  if (!submissionsOpen) {
+  // Cmd/Ctrl+Enter calls requestSubmit(), which a disabled button cannot stop:
+  // without this guard a double press sends the same report twice.
+  if (!submissionsOpen || sending) {
     return;
   }
 
@@ -127,12 +133,14 @@ async function handleSubmit() {
     return;
   }
 
+  sending = true;
   setComposerState(root, "sending", null, messages[locale]);
 
   try {
     await api.submit(input);
     form.reset();
     clearDraft(storage);
+    draftId = newDraftId();
     renderDraftStatus(root, "empty", messages[locale]);
     updateFormMeters(form);
     setComposerState(root, "sent", null, messages[locale]);
@@ -140,6 +148,8 @@ async function handleSubmit() {
   } catch (error) {
     const reason = error instanceof FeedbackSubmitError ? error.reason : "server";
     setComposerState(root, "error", SUBMIT_ERROR_COPY[reason], messages[locale]);
+  } finally {
+    sending = false;
   }
 }
 
@@ -154,9 +164,21 @@ form.addEventListener("input", () => {
 });
 
 form.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+  // isComposing: Enter also confirms a Vietnamese or CJK IME candidate.
+  if (event.key !== "Enter" || event.isComposing || event.repeat) {
+    return;
+  }
+
+  if (event.metaKey || event.ctrlKey) {
     event.preventDefault();
     form.requestSubmit();
+    return;
+  }
+
+  // A bare Enter in the one-line title would send before any details exist.
+  if (event.target instanceof HTMLInputElement && event.target.name === "title") {
+    event.preventDefault();
+    form.querySelector('[name="body"]')?.focus();
   }
 });
 
@@ -192,6 +214,7 @@ async function start() {
   const draft = readDraft(storage);
 
   if (draft) {
+    draftId = draft.id || draftId;
     fillForm(form, draft);
     renderDraftStatus(root, "saved", messages[locale]);
   }

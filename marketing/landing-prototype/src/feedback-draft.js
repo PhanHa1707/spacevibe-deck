@@ -12,7 +12,19 @@ import { BODY_MAX, FEEDBACK_CATEGORIES, TITLE_MAX } from "./feedback-api.js";
  */
 export const FEEDBACK_DRAFT_KEY = "deck.landing.feedbackDraft.v1";
 
-/** @returns {{ title: string, body: string, category: string, savedAt: string } | null} */
+// Same shape the Worker accepts for `id`. Drafts saved before ids existed
+// simply read back without one.
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+/**
+ * A fresh id for a new draft, or "" where the browser has no crypto.randomUUID
+ * (insecure context) — the Worker then creates the issue without one.
+ */
+export function newDraftId() {
+  return globalThis.crypto?.randomUUID?.() ?? "";
+}
+
+/** @returns {{ title: string, body: string, category: string, id: string, savedAt: string } | null} */
 export function readDraft(storage) {
   let raw = null;
 
@@ -44,6 +56,7 @@ export function readDraft(storage) {
     category: FEEDBACK_CATEGORIES.includes(draft.category)
       ? draft.category
       : FEEDBACK_CATEGORIES[0],
+    id: typeof draft.id === "string" && UUID_V4.test(draft.id) ? draft.id : "",
     savedAt: typeof draft.savedAt === "string" ? draft.savedAt : "",
   };
 }
@@ -53,7 +66,7 @@ export function readDraft(storage) {
  *
  * @returns {"saved" | "empty" | "refused"}
  */
-export function writeDraft(storage, { title, body, category }, now = new Date()) {
+export function writeDraft(storage, { title, body, category, id }, now = new Date()) {
   if (!storage) {
     return "refused";
   }
@@ -66,7 +79,7 @@ export function writeDraft(storage, { title, body, category }, now = new Date())
 
     storage.setItem(
       FEEDBACK_DRAFT_KEY,
-      JSON.stringify({ title, body, category, savedAt: now.toISOString() }),
+      JSON.stringify({ title, body, category, id, savedAt: now.toISOString() }),
     );
     return "saved";
   } catch {
