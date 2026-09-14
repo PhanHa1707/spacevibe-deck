@@ -35,16 +35,25 @@ export function reconcileCodexHooks(
   }
   const hooks = (value.hooks ?? {}) as Document;
   const command = codexHookCommand(scriptPath);
+  const managed: readonly string[] = CODEX_HOOK_EVENTS;
+  const isDeck = (handler: unknown) =>
+    record(handler) && handler.type === "command" && handler.command === command;
+  const holdsDeck = (groups: readonly Document[]) =>
+    groups.some((group) => (group.hooks as unknown[]).some(isDeck));
   const entries = Object.entries(hooks).map(([event, groups]) => {
     if (!Array.isArray(groups) || groups.some((g) => !record(g) || !Array.isArray(g.hooks))) {
       throw new Error(`Invalid Codex hook groups for ${event}; hooks were not changed.`);
     }
+    // Codex trusts a hook by its position in this file (`<file>:<event>:<group>:<handler>`
+    // in config.toml), so a registration already in place stays exactly where it is.
+    // Stripping and re-appending it would shift every group after it, and Codex would ask
+    // the user to review hooks that did not change.
+    if (enabled && managed.includes(event) && holdsDeck(groups)) {
+      return [event, groups] as const;
+    }
     const kept = groups.flatMap((group: Document) => {
       const handlers = group.hooks as unknown[];
-      const remaining = handlers.filter(
-        (handler) =>
-          !(record(handler) && handler.type === "command" && handler.command === command),
-      );
+      const remaining = handlers.filter((handler) => !isDeck(handler));
       if (remaining.length === handlers.length) return [group];
       return remaining.length === 0 ? [] : [{ ...group, hooks: remaining }];
     });
@@ -59,10 +68,15 @@ export function reconcileCodexHooks(
     ? {
         ...cleaned,
         ...Object.fromEntries(
-          CODEX_HOOK_EVENTS.map((event) => [
-            event,
-            [...(cleaned[event] ?? []), { hooks: [{ type: "command", command, timeout: 3 }] }],
-          ]),
+          CODEX_HOOK_EVENTS.map((event) => {
+            const groups = (cleaned[event] ?? []) as Document[];
+            return [
+              event,
+              holdsDeck(groups)
+                ? groups
+                : [...groups, { hooks: [{ type: "command", command, timeout: 3 }] }],
+            ];
+          }),
         ),
       }
     : cleaned;

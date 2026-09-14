@@ -32,6 +32,21 @@ describe("Codex hook registration", () => {
     expect(codexHookCommand("/a'b/hook.sh")).toContain("'\\''");
   });
 
+  it("leaves an existing registration in place so a user group after it keeps its position", () => {
+    // Codex keys hook trust by position (`hooks.json:stop:<group>:<handler>`); moving
+    // Deck's group to the end would shift the user's group and make Codex re-ask for it.
+    const enabled = reconcileCodexHooks({}, "/deck/hook.sh", true);
+    const deckStop = (enabled.hooks as Record<string, unknown[]>).Stop;
+    const userAfterDeck = {
+      ...enabled,
+      hooks: {
+        ...(enabled.hooks as Record<string, unknown[]>),
+        Stop: [...deckStop, { hooks: [{ type: "command", command: "my-notifier" }] }],
+      },
+    };
+    expect(reconcileCodexHooks(userAfterDeck, "/deck/hook.sh", true)).toEqual(userAfterDeck);
+  });
+
   it("keeps symlinks and file permissions, and never edits config.toml/notify", async () => {
     const dir = await temporary();
     const actual = path.join(dir, "real.json");
