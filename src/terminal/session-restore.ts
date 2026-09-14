@@ -401,9 +401,18 @@ export async function restoreSession(deps: RestoreDeps, mainLabel: string): Prom
     // main record, so a throw there must not skip this clear (H2).
     await clearSecondaryRecords(deps.journal, records.keys(), mainLabel);
 
+    // Guarded on its own: the tabs above are materialized hidden (`select:
+    // false`), so a throw here that skipped the selection below would leave
+    // them behind an empty stage (DECK-104). A failed reopen reads as no file
+    // tab surviving.
     const activeFileTarget =
       mainRecord !== null
-        ? await restoreFiles(deps.files, deps.statFiles, mainRecord, result.alive)
+        ? await restoreFiles(deps.files, deps.statFiles, mainRecord, result.alive).catch(
+            (err: unknown) => {
+              console.error("session restore: reopening file tabs failed:", err);
+              return null;
+            },
+          )
         : null;
 
     const restoreBoard = mainRecord?.agentBoardOpen === true && restored > 0;

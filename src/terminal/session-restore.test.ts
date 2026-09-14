@@ -662,6 +662,37 @@ describe("restoreSession", () => {
     expect(mocks.clearWindowRecord).toHaveBeenCalledWith("c");
   });
 
+  it("point 8d: a failed file reopen still selects the saved tab, never a blank stage (DECK-104)", async () => {
+    const records = new Map<string, WindowRecord>([
+      [
+        "main",
+        record({
+          tabs: [tab({ workspacePath: "/w" }), tab({ workspacePath: "/w" })],
+          activeTabIndex: 1,
+          files: [
+            {
+              workspacePath: "/w",
+              tabs: [{ path: "/w/a.ts", preview: false }],
+              activePath: null,
+            },
+          ],
+        }),
+      ],
+    ]);
+    const statFiles = vi.fn(async (): Promise<FileStatResult[]> => {
+      throw new Error("stat failed");
+    });
+    const { deps, mocks } = createFakeDeps({ records, statFiles });
+    const result = await restoreSession(deps, "main");
+    expect(statFiles).toHaveBeenCalled();
+    expect(result).toBe(true);
+    expect(mocks.selectTab).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith(
+      "session restore: reopening file tabs failed:",
+      expect.any(Error),
+    );
+  });
+
   it("point 9: marker set→clear bracketing, including clear-on-throw when the lookup rejects", async () => {
     const records = new Map<string, WindowRecord>([["main", record({ tabs: [tab()] })]]);
     const lookup = vi.fn(async (): Promise<readonly ResumeRef[]> => {
