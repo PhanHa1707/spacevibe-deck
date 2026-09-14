@@ -4,7 +4,7 @@
 .feedback-board {
   display: grid;
   align-content: start;
-  gap: 1rem;
+  gap: 0.8rem;
   min-width: 0;
 }
 
@@ -16,14 +16,14 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
   margin: 0;
-  padding: 0.85rem 1rem;
+  padding: 0.6rem 0.8rem;
   border-radius: var(--fb-radius-md);
   color: var(--log-ink-soft);
   background: var(--fb-surface);
   box-shadow: inset 0 0 0 1px var(--fb-border);
-  font: 500 0.86rem/1.4 var(--font-display);
+  font: 500 0.8rem/1.4 var(--font-display);
 }
 
 .feedback-board__status[hidden],
@@ -34,16 +34,16 @@
 .feedback-columns {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.9rem;
+  gap: 0.75rem;
 }
 
 .feedback-column {
   display: grid;
   align-content: start;
-  gap: 0.7rem;
+  gap: 0.55rem;
   min-width: 0;
-  min-height: 16rem;
-  padding: 0.7rem;
+  min-height: 12rem;
+  padding: 0.6rem;
   border-radius: var(--fb-radius-lg);
   background: var(--fb-surface);
   box-shadow: inset 0 0 0 1px var(--fb-border);
@@ -64,16 +64,16 @@
 .feedback-column__head {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.4rem 0.45rem 0.2rem;
+  gap: 0.5rem;
+  padding: 0.35rem 0.4rem 0.15rem;
 }
 
 .feedback-column__dot {
-  width: 0.55rem;
-  height: 0.55rem;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: 50%;
   background: var(--status);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--status) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status) 18%, transparent);
 }
 
 [data-column="review"] .feedback-column__dot {
@@ -83,17 +83,17 @@
 .feedback-column__head h3 {
   margin: 0;
   color: var(--log-ink);
-  font: 650 0.9rem/1 var(--font-display);
+  font: 650 0.82rem/1 var(--font-display);
 }
 
 .feedback-column__count {
-  min-width: 1.6rem;
+  min-width: 1.4rem;
   margin-left: auto;
-  padding: 0.28rem 0.5rem;
+  padding: 0.24rem 0.45rem;
   border-radius: 999px;
   color: var(--log-ink-soft);
   background: var(--fb-raised);
-  font: 600 0.72rem/1 var(--font-display);
+  font: 600 0.68rem/1 var(--font-display);
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
@@ -104,7 +104,7 @@
 
 .feedback-column__list {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.45rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -112,8 +112,8 @@
 
 .feedback-card {
   display: grid;
-  gap: 0.6rem;
-  padding: 0.95rem 1rem;
+  gap: 0.5rem;
+  padding: 0.75rem 0.8rem;
   border-radius: var(--fb-radius-md);
   background: var(--fb-raised);
   box-shadow:
@@ -145,17 +145,17 @@
 .feedback-tag {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem 0.6rem 0.3rem 0.45rem;
+  gap: 0.3rem;
+  padding: 0.26rem 0.5rem 0.26rem 0.4rem;
   border-radius: 999px;
   color: var(--tag-color);
   background: color-mix(in srgb, var(--tag-color) 14%, transparent);
-  font: 620 0.72rem/1 var(--font-display);
+  font: 620 0.68rem/1 var(--font-display);
 }
 
 .feedback-tag svg {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 0.8rem;
+  height: 0.8rem;
 }
 
 .feedback-tag[data-category="bug"] {
@@ -172,14 +172,14 @@
 
 .feedback-card__id {
   color: var(--log-ink-faint);
-  font: 500 0.68rem/1 var(--font-mono);
+  font: 500 0.64rem/1 var(--font-mono);
 }
 
 .feedback-card__title {
   margin: 0;
   overflow-wrap: anywhere;
   color: var(--log-ink);
-  font: 560 0.93rem/1.45 var(--font-display);
+  font: 560 0.86rem/1.45 var(--font-display);
   letter-spacing: -0.005em;
 }
 
@@ -189,11 +189,11 @@
 
 .feedback-card__time {
   color: var(--log-ink-faint);
-  font: 500 0.75rem/1 var(--font-display);
+  font: 500 0.7rem/1 var(--font-display);
 }
 
 .feedback-card--skeleton {
-  gap: 0.75rem;
+  gap: 0.6rem;
   animation: none;
 }
 
@@ -230,18 +230,18 @@
 .feedback-column__empty {
   display: grid;
   justify-items: center;
-  gap: 0.55rem;
-  padding: 1.75rem 0.75rem;
+  gap: 0.45rem;
+  padding: 1.25rem 0.6rem;
   border: 1.5px dashed rgb(255 255 255 / 10%);
   border-radius: var(--fb-radius-md);
   color: var(--log-ink-faint);
-  font: 500 0.84rem/1.45 var(--font-display);
+  font: 500 0.78rem/1.45 var(--font-display);
   text-align: center;
 }
 
 .feedback-column__empty svg {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.15rem;
+  height: 1.15rem;
   color: var(--status);
 }
 
@@ -262,13 +262,13 @@
     align-items: center;
     justify-content: center;
     gap: 0.35rem;
-    padding: 0.65rem 0.3rem;
+    padding: 0.55rem 0.3rem;
     border: 0;
     border-radius: 999px;
     color: var(--log-ink-soft);
     background: transparent;
     cursor: pointer;
-    font: 620 0.76rem/1 var(--font-display);
+    font: 620 0.72rem/1 var(--font-display);
     white-space: nowrap;
     transition:
       color 220ms var(--fb-ease),
