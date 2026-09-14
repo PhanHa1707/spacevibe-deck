@@ -19,6 +19,19 @@ export function signalChoicesAreCurrent(settings: Readonly<Record<string, unknow
   return settings.signalAdaptersRevision === SIGNAL_ADAPTERS_REVISION;
 }
 
+/**
+ * The settings patch for a Signals switch. It carries the revision because
+ * main merges a patch into the STORED file: adapters alone, merged into a file
+ * saved before the revision, would read as unchosen again — main would register
+ * nothing and the merged broadcast would flip the switch back off.
+ */
+export function signalAdaptersPatch<T>(adapters: T): {
+  readonly agentSignalAdapters: T;
+  readonly signalAdaptersRevision: number;
+} {
+  return { agentSignalAdapters: adapters, signalAdaptersRevision: SIGNAL_ADAPTERS_REVISION };
+}
+
 /** Whether stored (unvalidated) `settings` switch `agent`'s adapter on as a user choice. */
 export function storedSignalAdapterOn(settings: unknown, agent: string): boolean {
   if (typeof settings !== "object" || settings === null) return false;

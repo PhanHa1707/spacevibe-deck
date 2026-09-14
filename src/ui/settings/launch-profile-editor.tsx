@@ -6,6 +6,7 @@ import { ConfigGroup, ConfigRow } from "../controls/config-row";
 import { CommitInput } from "../controls/commit-input";
 import { AgentChoiceValue, CLI_DEFAULT_CHOICE } from "./agent-choice-value";
 import { settings, updateSettings } from "../../settings/settings-store";
+import { signalAdaptersPatch } from "../../settings/signal-adapter-choice";
 import { BUILTIN_AGENTS, type BuiltinAgent } from "../../lib/agent-catalog";
 import { AGENT_LOGOS } from "../../lib/agent-logos";
 import { letterAvatar } from "../../lib/letter-avatar";
@@ -414,7 +415,7 @@ export function LaunchProfileEditor() {
     if (!ADAPTER_AGENTS.has(agentId)) {
       return;
     }
-    updateSettings({ agentSignalAdapters: { ...adapters, [agentId]: next } });
+    updateSettings(signalAdaptersPatch({ ...adapters, [agentId]: next }));
   };
 
   const renderRow = (agent: BuiltinAgent) => (

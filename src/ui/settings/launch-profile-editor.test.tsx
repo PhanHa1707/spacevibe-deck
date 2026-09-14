@@ -30,6 +30,7 @@ import { LaunchProfileEditor } from "./launch-profile-editor";
 import { detectedAgents } from "../../terminal/agent-detection-store";
 import { settings, updateSettings } from "../../settings/settings-store";
 import { DEFAULT_SETTINGS } from "../../settings/settings-schema";
+import { SIGNAL_ADAPTERS_REVISION } from "../../settings/signal-adapter-choice";
 import type { LaunchProfile } from "../../lib/launch-profile";
 
 const plan: LaunchProfile = {
@@ -190,6 +191,11 @@ describe("LaunchProfileEditor", () => {
       ...originalAdapters,
       claude: !originalAdapters.claude,
     });
+    // Main merges the patch into the stored file; without the revision a file
+    // saved before it would read the switch as unchosen (DECK-102).
+    expect(updateSettings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ signalAdaptersRevision: SIGNAL_ADAPTERS_REVISION }),
+    );
     expect(settings.value.disabledAgents).toEqual(["claude"]);
     click(byLabel("Claude Code availability"));
     expect(settings.value.disabledAgents).toEqual([]);
