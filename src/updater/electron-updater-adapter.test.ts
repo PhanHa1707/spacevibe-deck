@@ -22,7 +22,7 @@ vi.mock("@tauri-apps/plugin-process", () => ({
   relaunch: mocks.tauriRelaunch,
 }));
 
-import { checkForUpdate, relaunchDeck } from "./electron-updater-adapter";
+import { checkForUpdate, relaunchDeck, reportUpdateError } from "./electron-updater-adapter";
 import { UPDATE_UNSUPPORTED } from "./update-controller";
 
 describe("checkForUpdate", () => {
@@ -82,7 +82,15 @@ describe("checkForUpdate", () => {
     }
     await update.download();
     expect(mocks.invoke).toHaveBeenCalledWith("update_download");
-    void update.install();
+    mocks.invoke.mockResolvedValueOnce({
+      status: "install-failed",
+      retryable: false,
+      message: "staging failed",
+    });
+    await expect(update.install()).rejects.toMatchObject({
+      message: "staging failed",
+      retryable: false,
+    });
     expect(mocks.invoke).toHaveBeenCalledWith("update_install");
   });
 
@@ -145,4 +153,55 @@ describe("relaunchDeck", () => {
     expect(mocks.electronRelaunch).toHaveBeenCalledOnce();
     expect(mocks.tauriRelaunch).not.toHaveBeenCalled();
   });
+});
+
+describe("reportUpdateError", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.stubGlobal("__deckHost", {});
+    vi.stubGlobal("__TAURI_INTERNALS__", undefined);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.invoke.mockResolvedValue(undefined);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ["Update check failed", "check"],
+    ["Update download failed", "download"],
+    ["Could not record the update attempt", "install"],
+  ])("forwards %s to local logging", (message, operation) => {
+    reportUpdateError(message, new TypeError("offline"));
+    expect(mocks.invoke).toHaveBeenCalledWith("update_report_error", {
+      operation,
+      name: "TypeError",
+      message: `${message}: offline`,
+    });
+  });
+  it("bounds renderer fields before IPC", () => {
+    reportUpdateError("Update check failed", new Error("x".repeat(5000)));
+    expect(mocks.invoke.mock.calls[0][1].message).toHaveLength(2048);
+  });
+  it.each(["browser", "tauri"])("keeps %s diagnostics out of Electron IPC", (host) => {
+    vi.stubGlobal("__deckHost", undefined);
+    vi.stubGlobal("__TAURI_INTERNALS__", host === "tauri" ? {} : undefined);
+    reportUpdateError("Update check failed", new Error("offline"));
+    expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+  it.each(["reject", "throw"])(
+    "contains an IPC %s without breaking error handling",
+    async (mode) => {
+      const error = new Error("logging unavailable");
+      if (mode === "reject") mocks.invoke.mockRejectedValue(error);
+      else
+        mocks.invoke.mockImplementation(() => {
+          throw error;
+        });
+      expect(() => reportUpdateError("Update check failed", new Error("offline"))).not.toThrow();
+      await Promise.resolve();
+      expect(console.error).toHaveBeenCalledWith("Could not persist updater error:", error);
+    },
+  );
 });

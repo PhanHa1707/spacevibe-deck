@@ -42,6 +42,15 @@ constants that currently switch behaviour off and are meant to be flipped back.
 
 - **The app running an update is the old build.** An updater fix cannot protect the
   transition into the release that carries it.
+- **An installer handover cannot be retried in the same process.**
+  [The Electron lifecycle](../../electron/updater/updater.ts) attributes late errors
+  to staging only when no check is in flight; a three-minute fallback handles
+  silence. Both paths release the installing flag but keep the handover guard.
+  [Update IPC](../../electron/ipc/register-updater.ts) returns a structured
+  non-retryable failure because Electron drops custom Error properties; the
+  [renderer adapter](../../src/updater/electron-updater-adapter.ts) preserves that
+  distinction. Keep it when changing failure copy or the About action.
+
 - **Two hosts means two answers.** A renderer change that passes under Electron says nothing
   about Tauri. Name the host a change runs on rather than implying both.
 - **Green unit and build checks are not native evidence.** They say nothing about PTYs, menu

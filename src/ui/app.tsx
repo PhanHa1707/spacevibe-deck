@@ -163,10 +163,14 @@ import { loadAppVersion } from "../updater/app-version";
 import { UpdateAction } from "../updater/update-action";
 // Host-agnostic by construction: it answers the Electron host, delegates to
 // `tauri-updater-adapter.ts` under Tauri, and fails soft in a browser preview.
-import { checkForUpdate, relaunchDeck } from "../updater/electron-updater-adapter";
+import {
+  checkForUpdate,
+  relaunchDeck,
+  reportUpdateError,
+} from "../updater/electron-updater-adapter";
 import { resolveUpdatePreview } from "../updater/update-preview";
 import { recordUpdateAttempt, takeUpdateOutcome } from "../updater/update-attempt-store";
-import { attemptMessage } from "../updater/update-attempt";
+import { attemptMessage, manualUpdateHint } from "../updater/update-attempt";
 import { isUpdateMenuAction, runUpdateMenuAction } from "../updater/update-menu-actions";
 import { defaultLinkClient } from "../terminal/link-client";
 import { buildOpenEditorRequest } from "../lib/editor-command";
@@ -295,7 +299,12 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
       },
       flush: flushSettingsSave,
       relaunch: relaunchDeck,
-      report: (message, error) => console.error(`${message}:`, error),
+      report: (message, error) => {
+        reportUpdateError(message, error);
+        if (message === "Update install failed" || message === "Update download failed") {
+          reportPersistError(`${message}. ${manualUpdateHint(getDesktopEnvironment().platform)}`);
+        }
+      },
       recordAttempt: (targetVersion) => recordUpdateAttempt(targetVersion, Date.now()),
     });
     activeUpdateController.value = updaterRef.current;
@@ -623,7 +632,7 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
       // wondering why the version never changes. Reporting is fire-and-forget
       // — a diagnostic must never delay the terminal coming up.
       void takeUpdateOutcome().then((outcome) => {
-        const message = attemptMessage(outcome);
+        const message = attemptMessage(outcome, getDesktopEnvironment().platform);
         if (message !== null) {
           reportPersistError(message);
         }
@@ -1587,6 +1596,9 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
   const updateAction = (
     <UpdateAction
       view={updatePreview ?? updater.view.value}
+      onCheck={() => {
+        if (updatePreview === null) void updater.checkNow();
+      }}
       onDownload={() => {
         if (updatePreview === null) void updater.download();
       }}

@@ -7,6 +7,18 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 
 ## Unreleased
 
+### Updates
+
+- **Update failures are easier to recover from.** Two consecutive failed checks
+  show [Update check failed · Retry](src/updater/update-action.tsx). Failed downloads
+  and installs point to Release Notes for a manual download.
+- **A stalled installer no longer leaves Deck showing Installing indefinitely.**
+  [Late staging errors and a fallback timeout](electron/updater/updater.ts) surface
+  the failure. After handover, quit and reopen Deck before trying again.
+- **Updater diagnostics stay on your machine.** A small, rotated
+  [updater.log](electron/updater/error-log.ts) records errors locally without adding
+  telemetry fields.
+
 ### Privacy
 
 - **Usage stats now count Deck's own update checks.** The daily snapshot adds how

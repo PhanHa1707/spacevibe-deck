@@ -88,10 +88,25 @@ export function resolveAttemptOutcome(attempt: unknown, currentVersion: string):
  * assert. A superseded record says the version actually running rather than
  * the stale one it was written with.
  */
-export function attemptMessage(outcome: AttemptOutcome): string | null {
+export function manualUpdateHint(
+  platform: "macos" | "windows" | "unsupported" = "unsupported",
+): string {
+  const location =
+    platform === "macos"
+      ? "the app menu"
+      : platform === "windows"
+        ? "Settings → About"
+        : "the app menu on macOS or Settings → About on Windows";
+  return `Open Release Notes in ${location} to download the update manually.`;
+}
+
+export function attemptMessage(
+  outcome: AttemptOutcome,
+  platform: "macos" | "windows" | "unsupported" = "unsupported",
+): string | null {
   switch (outcome.kind) {
     case "incomplete":
-      return `Deck ${outcome.attempt.targetVersion} didn't finish installing — still running ${outcome.attempt.fromVersion}. Download it manually if this keeps happening.`;
+      return `Deck ${outcome.attempt.targetVersion} didn't finish installing — still running ${outcome.attempt.fromVersion}. ${manualUpdateHint(platform)}`;
     case "superseded":
       return `An earlier update to Deck ${outcome.attempt.targetVersion} never completed. Now running ${outcome.version}.`;
     case "succeeded":

@@ -14,6 +14,7 @@ import type { UpdateCheckResult, UpdatePhase } from "../../../updater/update-con
  */
 const PILL: Readonly<Record<UpdatePhase, string>> = {
   hidden: "check",
+  "check-failed": "check failed · retry",
   available: "update",
   downloading: "downloading…",
   downloaded: "install & relaunch",
@@ -45,9 +46,10 @@ export function AboutSection() {
   const lastCheck = useSignal<UpdateCheckResult | null>(null);
   const view = controller?.view.value;
   const phase = view?.phase ?? "hidden";
+  const cannotRetry = phase === "install-failed" && view?.installRetryable === false;
 
   const handleUpdateAction = async (): Promise<void> => {
-    if (controller === null || busy.value) {
+    if (controller === null || busy.value || cannotRetry) {
       return;
     }
     busy.value = true;
@@ -87,8 +89,9 @@ export function AboutSection() {
   // The outcome of the last check wins over the version line: pressing the
   // pill has to visibly answer, or it reads as a dead button. "currently"
   // stays lowercase after the dash — mid-sentence, not a fresh label (DL-4.4).
-  const desc =
-    phase === "hidden" && lastCheck.value !== null
+  const desc = cannotRetry
+    ? "The installer did not take over. Quit and reopen Deck, or open Release Notes below for a manual download."
+    : phase === "hidden" && lastCheck.value !== null
       ? `${CHECK_RESULT_DESC[lastCheck.value]}${version === "" ? "" : ` — currently ${version}`}`
       : version === ""
         ? ""
@@ -100,10 +103,14 @@ export function AboutSection() {
         <button
           type="button"
           class={`cfg-btn ${busy.value || working ? "cfg-btn--disabled" : ""}`}
-          disabled={controller === null || busy.value || working}
+          disabled={controller === null || busy.value || working || cannotRetry}
           onClick={() => void handleUpdateAction()}
         >
-          {busy.value && phase === "hidden" ? "checking…" : PILL[phase]}
+          {cannotRetry
+            ? "install failed"
+            : busy.value && (phase === "hidden" || phase === "check-failed")
+              ? "checking…"
+              : PILL[phase]}
         </button>
       </ConfigRow>
       <ConfigRow label="Release notes" desc="What changed in each version">

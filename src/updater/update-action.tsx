@@ -1,13 +1,18 @@
+import { getDesktopEnvironment, type DesktopPlatform } from "../lib/platform";
+import { manualUpdateHint } from "./update-attempt";
 import type { UpdatePhase, UpdateView } from "./update-controller";
 
 interface UpdateActionProps {
   readonly view: UpdateView;
+  readonly onCheck: () => void;
+  readonly platform?: DesktopPlatform;
   readonly onDownload: () => void;
   readonly onInstall: () => void;
   readonly onRelaunch: () => void;
 }
 
 const LABELS: Readonly<Record<Exclude<UpdatePhase, "hidden">, string>> = {
+  "check-failed": "Update check failed · Retry",
   available: "Update",
   downloading: "Downloading…",
   downloaded: "Install & Relaunch",
@@ -18,6 +23,7 @@ const LABELS: Readonly<Record<Exclude<UpdatePhase, "hidden">, string>> = {
 };
 
 const ANNOUNCEMENTS: Readonly<Record<Exclude<UpdatePhase, "hidden">, string>> = {
+  "check-failed": "Update check failed. Retry checking for updates.",
   available: "Deck update available.",
   downloading: "Downloading Deck update.",
   downloaded: "Deck update downloaded. Ready to install and relaunch.",
@@ -30,10 +36,14 @@ const ANNOUNCEMENTS: Readonly<Record<Exclude<UpdatePhase, "hidden">, string>> = 
 function accessibleName(view: UpdateView): string {
   const versions = `update ${view.availableVersion} (current ${view.currentVersion})`;
   switch (view.phase) {
+    case "check-failed":
+      return "Update check failed. Retry checking for updates.";
     case "downloaded":
       return `Install update ${view.availableVersion} and relaunch Deck (current ${view.currentVersion})`;
     case "install-failed":
-      return `Retry installing ${versions}`;
+      return view.installRetryable === false
+        ? "Update installation failed. Quit and reopen Deck."
+        : `Retry installing ${versions}`;
     case "relaunch-failed":
       return "Relaunch Deck after installing update";
     case "downloading":
@@ -50,6 +60,7 @@ function accessibleName(view: UpdateView): string {
 }
 
 function actionForPhase(props: UpdateActionProps): () => void {
+  if (props.view.phase === "check-failed") return props.onCheck;
   if (props.view.phase === "relaunch-failed") {
     return props.onRelaunch;
   }
@@ -66,18 +77,27 @@ export function UpdateAction(props: UpdateActionProps) {
   }
   const busy = view.phase === "downloading" || view.phase === "installing";
   const failed = view.phase.endsWith("-failed");
-  const label = LABELS[view.phase];
-  const title = [accessibleName(view), view.notes].filter(Boolean).join(" — ");
+  const cannotRetry = view.phase === "install-failed" && view.installRetryable === false;
+  const label = cannotRetry ? "Install failed · Reopen Deck" : LABELS[view.phase];
+  const recovery =
+    view.phase === "download-failed" || view.phase === "install-failed"
+      ? manualUpdateHint(props.platform ?? getDesktopEnvironment().platform)
+      : "";
+  const announcement = cannotRetry
+    ? "Update installation failed. Quit and reopen Deck."
+    : ANNOUNCEMENTS[view.phase];
+  const title = [accessibleName(view), recovery, view.notes].filter(Boolean).join(" — ");
   return (
     <span class="update-action-wrap">
       <button
         type="button"
         class={`update-action ${failed ? "update-action--failed" : ""}`}
         disabled={busy}
+        aria-disabled={cannotRetry ? "true" : undefined}
         aria-busy={busy ? "true" : undefined}
         aria-label={accessibleName(view)}
         title={title}
-        onClick={actionForPhase(props)}
+        onClick={cannotRetry ? undefined : actionForPhase(props)}
       >
         <span class="update-action__full">{label}</span>
         {view.phase === "downloaded" ? (
@@ -87,7 +107,7 @@ export function UpdateAction(props: UpdateActionProps) {
         ) : null}
       </button>
       <span class="update-action__live" aria-live="polite" aria-atomic="true">
-        {ANNOUNCEMENTS[view.phase]}
+        {[announcement, recovery].filter(Boolean).join(" ")}
       </span>
     </span>
   );

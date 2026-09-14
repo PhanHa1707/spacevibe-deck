@@ -58,6 +58,25 @@ describe("runUpdateMenuAction", () => {
     );
   });
 
+  it("explains the handover lock instead of blaming the connection", async () => {
+    const { deps } = setup(
+      controller("failed", {
+        phase: "install-failed",
+        installRetryable: false,
+        currentVersion: "1.2.0",
+        availableVersion: "1.2.1",
+        notes: "",
+      }),
+    );
+    await runUpdateMenuAction("check-for-updates", deps);
+    expect(deps.notify).toHaveBeenCalledWith(
+      expect.stringContaining("Quit and reopen Deck"),
+      "error",
+    );
+    expect(deps.notify).toHaveBeenCalledWith(expect.stringContaining("Release Notes"), "error");
+    expect(deps.notify.mock.calls[0][0]).not.toContain("connection");
+  });
+
   it("opens the trusted web release notes URL", async () => {
     const { deps } = setup(controller("current"));
 

@@ -28,6 +28,7 @@ import { SectionHead, Specimen, StateLabel } from "../specimen";
 
 /** Every phase the update pill can be in, `hidden` excluded — it renders nothing. */
 const UPDATE_PHASES: readonly Exclude<UpdatePhase, "hidden">[] = [
+  "check-failed",
   "available",
   "downloading",
   "downloaded",
@@ -160,7 +161,7 @@ export function ChromeSection() {
 
       <Specimen
         name="UpdateAction"
-        note="all seven visible phases — the app only ever shows one"
+        note="all visible phases — the app only ever shows one"
         surface="chrome-1"
       >
         <div class="gx-inline">
@@ -174,6 +175,7 @@ export function ChromeSection() {
                   availableVersion: "0.12.3",
                   notes: "Fixes the thing.",
                 }}
+                onCheck={NOOP}
                 onDownload={NOOP}
                 onInstall={NOOP}
                 onRelaunch={NOOP}

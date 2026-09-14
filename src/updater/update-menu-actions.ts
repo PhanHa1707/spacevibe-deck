@@ -1,3 +1,4 @@
+import { manualUpdateHint } from "./update-attempt";
 import type { UpdateCheckResult, UpdateController } from "./update-controller";
 
 export const RELEASE_NOTES_URL = "https://deck.spacevibe.dev/landing-prototype/changelog/";
@@ -56,6 +57,14 @@ export async function runUpdateMenuAction(
 ): Promise<boolean> {
   if (action === "check-for-updates") {
     const result = await deps.controller.checkNow();
+    if (deps.controller.view.value.installRetryable === false) {
+      await notifySafely(
+        deps,
+        `The update installer did not take over. Quit and reopen Deck. ${manualUpdateHint()}`,
+        "error",
+      );
+      return true;
+    }
     const [message, kind] = checkResultMessage(result, deps.controller.view.value.availableVersion);
     await notifySafely(deps, message, kind);
     return true;

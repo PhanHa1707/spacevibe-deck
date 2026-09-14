@@ -3,6 +3,16 @@ import { invoke } from "../host/bridge";
 import type { DesktopPlatform } from "../lib/platform";
 
 const MAX_RELEASE_NOTES_LENGTH = 400;
+const CHECK_FAILURE_THRESHOLD = 2;
+
+export class UpdateInstallError extends Error {
+  constructor(
+    message: string,
+    readonly retryable: boolean,
+  ) {
+    super(message);
+  }
+}
 
 /**
  * How often a window that found nothing at launch looks again.
@@ -17,6 +27,7 @@ export const BACKGROUND_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 export type UpdatePhase =
   | "hidden"
+  | "check-failed"
   | "available"
   | "downloading"
   | "downloaded"
@@ -30,6 +41,7 @@ export interface UpdateView {
   readonly currentVersion: string;
   readonly availableVersion: string;
   readonly notes: string;
+  readonly installRetryable?: boolean;
 }
 
 export interface PendingUpdate {
@@ -124,6 +136,7 @@ export function createUpdateController(deps: UpdateControllerDependencies): Upda
   const view = signal<UpdateView>(HIDDEN_VIEW);
   let update: PendingUpdate | null = null;
   let started = false;
+  let consecutiveCheckFailures = 0;
   let operation: Promise<void> | null = null;
   let checkOperation: Promise<UpdateCheckResult> | null = null;
 
@@ -148,6 +161,7 @@ export function createUpdateController(deps: UpdateControllerDependencies): Upda
     checkOperation = (async () => {
       try {
         const result = await deps.check();
+        consecutiveCheckFailures = 0;
         if (result === UPDATE_UNSUPPORTED) {
           update = null;
           view.value = HIDDEN_VIEW;
@@ -158,7 +172,12 @@ export function createUpdateController(deps: UpdateControllerDependencies): Upda
         return update === null ? "current" : "available";
       } catch (error: unknown) {
         deps.report("Update check failed", error);
-        view.value = HIDDEN_VIEW;
+        consecutiveCheckFailures += 1;
+        update = null;
+        view.value =
+          consecutiveCheckFailures >= CHECK_FAILURE_THRESHOLD
+            ? { ...HIDDEN_VIEW, phase: "check-failed" }
+            : HIDDEN_VIEW;
         return "failed";
       }
     })().finally(() => {
@@ -172,13 +191,16 @@ export function createUpdateController(deps: UpdateControllerDependencies): Upda
    *
    * The four it excludes are an update the user is mid-way through — on screen
    * to install, downloading, or installing — where a check could replace the
-   * very version being acted on, and discard a file already on disk. The three
-   * FAILED phases are included on purpose: nothing in the UI returns the view
+   * very version being acted on, and discard a file already on disk. Failed
+   * phases are included on purpose: nothing in the UI returns the view
    * to `hidden`, so treating them as "busy" would mean one dropped connection
-   * during a download silences the recheck for the rest of the session.
+   * during a download silences the recheck for the rest of the session. A
+   * non-retryable install failure is separately excluded: handover stays locked
+   * until the next process, so a check must not replace its recovery guidance.
    */
   const RECHECKABLE_PHASES: ReadonlySet<UpdatePhase> = new Set([
     "hidden",
+    "check-failed",
     "download-failed",
     "install-failed",
     "relaunch-failed",
@@ -252,7 +274,7 @@ export function createUpdateController(deps: UpdateControllerDependencies): Upda
     // the whole session — and the peer holding the claim can close at any
     // moment.
     recheckTimer = setInterval(() => {
-      if (!RECHECKABLE_PHASES.has(view.value.phase)) {
+      if (!RECHECKABLE_PHASES.has(view.value.phase) || view.value.installRetryable === false) {
         return;
       }
       void claimedCheck().then(stopIfUnsupported);
@@ -267,7 +289,11 @@ export function createUpdateController(deps: UpdateControllerDependencies): Upda
   };
 
   const checkNow = (): Promise<UpdateCheckResult> =>
-    view.value.phase === "hidden" ? checkForAvailableUpdate() : Promise.resolve("available");
+    view.value.installRetryable === false
+      ? Promise.resolve("failed")
+      : view.value.phase === "hidden" || view.value.phase === "check-failed"
+        ? checkForAvailableUpdate()
+        : Promise.resolve("available");
 
   const download = (): Promise<void> =>
     singleFlight(async () => {
@@ -305,6 +331,7 @@ export function createUpdateController(deps: UpdateControllerDependencies): Upda
     singleFlight(async () => {
       if (
         update === null ||
+        view.value.installRetryable === false ||
         (view.value.phase !== "downloaded" && view.value.phase !== "install-failed")
       ) {
         return;
@@ -333,7 +360,10 @@ export function createUpdateController(deps: UpdateControllerDependencies): Upda
         await update.install();
       } catch (error: unknown) {
         deps.report("Update install failed", error);
-        view.value = updateView(update, "install-failed");
+        view.value = {
+          ...updateView(update, "install-failed"),
+          installRetryable: !(error instanceof UpdateInstallError) || error.retryable,
+        };
         return;
       }
       try {

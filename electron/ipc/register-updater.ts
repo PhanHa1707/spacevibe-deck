@@ -16,7 +16,12 @@
 import { app, ipcMain, type IpcMainInvokeEvent } from "electron";
 import { autoUpdater } from "electron-updater";
 import { CHANNELS } from "./channels";
-import { createUpdateLifecycle, type AutoUpdaterLike } from "../updater/updater";
+import {
+  createUpdateLifecycle,
+  InstallHandoverError,
+  type AutoUpdaterLike,
+} from "../updater/updater";
+import { createUpdaterErrorLog, parseUpdaterError } from "../updater/error-log";
 import { UpdateFlight } from "../updater/update-flight";
 import type { UpdateCounterKey } from "../telemetry/model";
 
@@ -66,6 +71,7 @@ export function registerUpdater(deps: UpdaterDependencies): UpdaterHandle {
     }
   });
 
+  const log = createUpdaterErrorLog(app.getPath("userData"), () => lifecycle.operation());
   const lifecycle = createUpdateLifecycle({
     loadUpdater: () => {
       // GitHub provider, no token: `mxrsv/spacevibe-deck` is public. Named
@@ -74,6 +80,7 @@ export function registerUpdater(deps: UpdaterDependencies): UpdaterHandle {
       // worth pointing at a real feed without it. `electron-updater` reads
       // `latest-mac.yml` / `latest.yml`; Tauri's `latest.json` is a separate
       // manifest with separate trust material and is never touched here.
+      autoUpdater.logger = log.logger;
       autoUpdater.setFeedURL({
         provider: "github",
         owner: "mxrsv",
@@ -86,12 +93,25 @@ export function registerUpdater(deps: UpdaterDependencies): UpdaterHandle {
     currentVersion: app.getVersion(),
     prepareForInstall: () => deps.prepareForInstall(),
     countOutcome: (outcome) => deps.countOutcome(outcome),
-    report: (message, error) => console.error(`Deck: ${message}`, error),
+    report: log.report,
   });
 
   ipcMain.handle(CHANNELS.updateCheck, () => lifecycle.check());
   ipcMain.handle(CHANNELS.updateDownload, () => lifecycle.download());
-  ipcMain.handle(CHANNELS.updateInstall, () => lifecycle.install());
+  ipcMain.handle(CHANNELS.updateInstall, async () => {
+    try {
+      await lifecycle.install();
+    } catch (error) {
+      if (error instanceof InstallHandoverError) {
+        // Electron drops custom Error properties when rejecting invoke().
+        return { status: "install-failed", retryable: false, message: error.message };
+      }
+      throw error;
+    }
+  });
+  ipcMain.handle(CHANNELS.updateReportError, (_event, payload: unknown) => {
+    log.write(parseUpdaterError(payload));
+  });
 
   return {
     forgetWindow: (label) => flight.forget(label),

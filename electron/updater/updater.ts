@@ -37,6 +37,14 @@
 
 import type { UpdateCounterKey } from "../telemetry/model";
 
+// Conservative fallback; late attributed errors settle immediately.
+export const INSTALL_HANDOVER_TIMEOUT_MS = 3 * 60 * 1000;
+
+/** IPC serializes this as a non-retryable failure, preserving the handover guard. */
+export class InstallHandoverError extends Error {
+  override readonly name = "InstallHandoverError";
+}
+
 /** The `electron-updater` surface this module uses, and nothing wider. */
 export interface AutoUpdaterLike {
   autoDownload: boolean;
@@ -109,6 +117,7 @@ export interface UpdateLifecycle {
   install(): Promise<void>;
   /** True from the moment the install begins until it fails. */
   isInstalling(): boolean;
+  operation(): "check" | "download" | "install";
 }
 
 interface Settle {
@@ -162,6 +171,9 @@ export function createUpdateLifecycle(deps: UpdateLifecycleDependencies): Update
   let installSettle: Settle | null = null;
   /** Set once the installer has accepted the handover; never cleared. */
   let handedOver = false;
+  let checksInFlight = 0;
+  let lastOperation: "check" | "download" | "install" = "check";
+  let handoverTimer: ReturnType<typeof setTimeout> | null = null;
   let errorSink: ((error: Error) => void) | null = null;
 
   const settleDownload = (): void => {
@@ -188,16 +200,16 @@ export function createUpdateLifecycle(deps: UpdateLifecycleDependencies): Update
     loaded.allowPrerelease = isPrereleaseVersion(deps.currentVersion);
     loaded.on("update-downloaded", () => settleDownload());
     loaded.on("error", (error) => {
-      // `electron-updater` has ONE error channel for every operation, so an
-      // error here may belong to a check another window started. Blaming it on
-      // whatever is outstanding was worse than useless: a failed check during
-      // an install reported `install-failed`, dropped `isInstalling()` while
-      // the installer was still staging, and left the quit census back in
-      // force to deadlock the handover it had just stood aside for. The sink
-      // is armed only where an error can be attributed with certainty.
+      // A peer check shares this channel with Squirrel staging. Attribute a
+      // late error only while no check is outstanding; ambiguity falls back
+      // to the handover timeout without releasing the quit census early.
       const sink = errorSink;
       if (sink !== null) {
         sink(asError(error));
+        return;
+      }
+      if (handedOver && installSettle !== null && checksInFlight === 0) {
+        installSettle.reject(new InstallHandoverError(asError(error).message));
         return;
       }
       deps.report("Updater reported an error", error);
@@ -211,11 +223,16 @@ export function createUpdateLifecycle(deps: UpdateLifecycleDependencies): Update
       return { status: "unsupported" };
     }
     let result: UpdateCheckLike | null;
+    checksInFlight += 1;
+    lastOperation = "check";
     try {
       result = await load().checkForUpdates();
     } catch (error: unknown) {
       deps.countOutcome("checkFailed");
+      deps.report("Update check failed", error);
       throw error;
+    } finally {
+      checksInFlight -= 1;
     }
     if (result === null) {
       // `electron-updater` answers null when it refuses to run at all — an
@@ -244,6 +261,16 @@ export function createUpdateLifecycle(deps: UpdateLifecycleDependencies): Update
   };
 
   const download = (): Promise<void> => {
+    // A peer window can discover a newer version during staging. Starting
+    // its download would put another source on the shared error channel,
+    // invalidating the late-install attribution above.
+    if (installInFlight !== null || handedOver) {
+      return Promise.reject(
+        new Error(
+          "Deck has already started installing an update. Quit and reopen Deck before downloading another.",
+        ),
+      );
+    }
     const target = availableVersion;
     if (target === null) {
       return Promise.reject(new Error("No update has been found to download."));
@@ -263,6 +290,7 @@ export function createUpdateLifecycle(deps: UpdateLifecycleDependencies): Update
             new Error(`Deck is already downloading ${downloadTarget ?? "another update"}.`),
           );
     }
+    lastOperation = "download";
     downloadTarget = target;
     downloadInFlight = new Promise<void>((resolve, reject) => {
       downloadSettle = { resolve, reject };
@@ -273,6 +301,7 @@ export function createUpdateLifecycle(deps: UpdateLifecycleDependencies): Update
         () => deps.countOutcome("downloaded"),
         (error: unknown) => {
           deps.countOutcome("downloadFailed");
+          deps.report("Update download failed", error);
           throw error;
         },
       )
@@ -302,7 +331,9 @@ export function createUpdateLifecycle(deps: UpdateLifecycleDependencies): Update
       // forever — and `MacUpdater.quitAndInstall` adds another
       // `update-downloaded` listener each time, so a later success would run
       // the handover once per attempt.
-      return Promise.reject(new Error("Deck has already handed this update to the installer."));
+      return Promise.reject(
+        new InstallHandoverError("Deck has already handed this update to the installer."),
+      );
     }
     if (availableVersion === null || downloadedVersion !== availableVersion) {
       // Also the guard for "another window downloaded a different version":
@@ -313,12 +344,16 @@ export function createUpdateLifecycle(deps: UpdateLifecycleDependencies): Update
     if (installInFlight !== null) {
       return installInFlight;
     }
+    lastOperation = "install";
     installInFlight = new Promise<void>((_resolve, reject) => {
       // No `resolve` is captured on purpose: success ends this process. See
       // the docblock.
       installSettle = {
         resolve: () => {},
         reject: (error) => {
+          if (handoverTimer !== null) clearTimeout(handoverTimer);
+          handoverTimer = null;
+          deps.report("Update install failed", error);
           installInFlight = null;
           installSettle = null;
           reject(error);
@@ -338,8 +373,8 @@ export function createUpdateLifecycle(deps: UpdateLifecycleDependencies): Update
       // `quitAndInstall` reports a refused handover through the error channel
       // rather than by throwing, and it does so SYNCHRONOUSLY (BaseUpdater
       // dispatches before returning false, and resets its own flag so a retry
-      // is safe). That window is the only place an error on the shared channel
-      // is certainly this install's, so it is the only place the sink is armed.
+      // is safe). This sink captures the synchronous refusal separately from
+      // the post-handover staging errors handled by the permanent listener.
       let handoverError: Error | null = null;
       errorSink = (error) => {
         handoverError = error;
@@ -356,6 +391,14 @@ export function createUpdateLifecycle(deps: UpdateLifecycleDependencies): Update
         return;
       }
       handedOver = true;
+      handoverTimer = setTimeout(() => {
+        installSettle?.reject(
+          new InstallHandoverError(
+            "The installer did not take over. Quit and reopen Deck, or use Release Notes to download the update manually.",
+          ),
+        );
+      }, INSTALL_HANDOVER_TIMEOUT_MS);
+      handoverTimer.unref?.();
     })();
     return installInFlight;
   };
@@ -365,5 +408,13 @@ export function createUpdateLifecycle(deps: UpdateLifecycleDependencies): Update
     download,
     install,
     isInstalling: () => installInFlight !== null,
+    operation: () =>
+      checksInFlight > 0
+        ? "check"
+        : installInFlight !== null || handedOver
+          ? "install"
+          : downloadInFlight !== null
+            ? "download"
+            : lastOperation,
   });
 }

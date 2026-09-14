@@ -3,6 +3,7 @@ import {
   BACKGROUND_CHECK_INTERVAL_MS,
   createUpdateController,
   UPDATE_UNSUPPORTED,
+  UpdateInstallError,
   type PendingUpdate,
   type UpdateControllerDependencies,
 } from "./update-controller";
@@ -36,6 +37,77 @@ function setup(
 }
 
 describe("createUpdateController", () => {
+  it("shows two consecutive check failures and clears them on a successful retry", async () => {
+    const check = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error("offline"));
+    const { controller } = setup(null, { check });
+    await expect(controller.checkNow()).resolves.toBe("failed");
+    expect(controller.view.value.phase).toBe("hidden");
+    await expect(controller.checkNow()).resolves.toBe("failed");
+    expect(controller.view.value.phase).toBe("check-failed");
+    await expect(controller.checkNow()).resolves.toBe("current");
+    expect(controller.view.value.phase).toBe("hidden");
+    await controller.checkNow();
+    expect(controller.view.value.phase).toBe("hidden");
+  });
+
+  it("keeps automatically checking from check-failed and resets after recovery", async () => {
+    vi.useFakeTimers();
+    try {
+      const check = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("offline"))
+        .mockRejectedValueOnce(new Error("offline"))
+        .mockResolvedValue(null);
+      const { controller } = setup(null, {
+        check,
+        claim: async () => true,
+        releaseClaim: async () => {},
+      });
+      await controller.start();
+      expect(controller.view.value.phase).toBe("hidden");
+      await vi.advanceTimersByTimeAsync(BACKGROUND_CHECK_INTERVAL_MS);
+      expect(controller.view.value.phase).toBe("check-failed");
+      await vi.advanceTimersByTimeAsync(BACKGROUND_CHECK_INTERVAL_MS);
+      expect(controller.view.value.phase).toBe("hidden");
+      expect(check).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never retries or rechecks a failed handover", async () => {
+    vi.useFakeTimers();
+    try {
+      const update = pending({
+        install: vi.fn().mockRejectedValue(new UpdateInstallError("staging failed", false)),
+      });
+      const { controller, deps } = setup(update, {
+        claim: async () => true,
+        releaseClaim: async () => {},
+      });
+      await controller.start();
+      await controller.download();
+      await controller.installAndRelaunch();
+      expect(controller.view.value).toMatchObject({
+        phase: "install-failed",
+        installRetryable: false,
+      });
+      await controller.installAndRelaunch();
+      await expect(controller.checkNow()).resolves.toBe("failed");
+      await vi.advanceTimersByTimeAsync(BACKGROUND_CHECK_INTERVAL_MS);
+      expect(update.install).toHaveBeenCalledTimes(1);
+      expect(deps.check).toHaveBeenCalledTimes(1);
+      expect(deps.relaunch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("checks once and leaves an available update undownloaded", async () => {
     const { controller, deps, update } = setup();
 

@@ -22,6 +22,7 @@ import { relaunch as relaunchElectron } from "../host/shell-host";
 import { invoke } from "../host/bridge";
 import {
   UPDATE_UNSUPPORTED,
+  UpdateInstallError,
   type PendingUpdate,
   type UpdateUnsupported,
 } from "./update-controller";
@@ -119,7 +120,22 @@ export async function checkForUpdate(): Promise<PendingUpdate | UpdateUnsupporte
     // Squirrel or the NSIS installer, both of which relaunch Deck themselves,
     // and this process is gone before a reply could arrive — so the
     // controller's own relaunch step is deliberately never reached here.
-    install: () => invoke<void>("update_install"),
+    install: async () => {
+      const installReply = await invoke<unknown>("update_install");
+      if (
+        isRecord(installReply) &&
+        installReply.status === "install-failed" &&
+        installReply.retryable === false &&
+        typeof installReply.message === "string"
+      ) {
+        throw new UpdateInstallError(installReply.message, false);
+      }
+      // A successful Electron install ends this process and never replies.
+      throw new UpdateInstallError(
+        "Unexpected reply from the update installer. Quit and reopen Deck.",
+        false,
+      );
+    },
   });
 }
 
@@ -129,4 +145,30 @@ export async function relaunchDeck(): Promise<void> {
     return relaunchTauri();
   }
   return relaunchElectron();
+}
+
+/** Keep renderer diagnostics local on Electron; frozen Tauri keeps its console sink. */
+export function reportUpdateError(message: string, error: unknown): void {
+  console.error(`${message}:`, error);
+  if (!hasDeckHost() || isTauriHost()) return;
+  const operation = /check/i.test(message)
+    ? "check"
+    : /download/i.test(message)
+      ? "download"
+      : "install";
+  const limit = 2048;
+  void (async () => {
+    try {
+      await invoke<void>("update_report_error", {
+        operation,
+        name: (error instanceof Error ? error.name : "Error").slice(0, limit),
+        message: `${message}: ${error instanceof Error ? error.message : String(error)}`.slice(
+          0,
+          limit,
+        ),
+      });
+    } catch (logError: unknown) {
+      console.error("Could not persist updater error:", logError);
+    }
+  })();
 }

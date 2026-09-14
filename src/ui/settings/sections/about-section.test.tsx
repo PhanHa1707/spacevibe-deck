@@ -56,6 +56,49 @@ describe("AboutSection", () => {
     activeUpdateController.value = null;
   });
 
+  it("rechecks from check-failed and shows pending then recovered state", async () => {
+    const updater = controller({ phase: "check-failed" });
+    let resolve!: () => void;
+    vi.mocked(updater.checkNow).mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = () => {
+            (updater.view as ReturnType<typeof signal<UpdateView>>).value = {
+              ...updater.view.value,
+              phase: "hidden",
+            };
+            done("current");
+          };
+        }),
+    );
+    activeUpdateController.value = updater;
+    act(() => render(<AboutSection />, host));
+    expect(pills(host)[0].textContent).toBe("check failed · retry");
+    act(() => pills(host)[0].click());
+    expect(pills(host)[0].disabled).toBe(true);
+    expect(pills(host)[0].textContent).toBe("checking…");
+    await act(async () => resolve());
+    expect(updater.checkNow).toHaveBeenCalledOnce();
+    expect(pills(host)[0].disabled).toBe(false);
+    expect(host.textContent).toContain("You're on the latest version");
+  });
+
+  it("blocks another install after handover and keeps Release Notes usable", async () => {
+    const updater = controller({ phase: "install-failed", installRetryable: false });
+    activeUpdateController.value = updater;
+    act(() => render(<AboutSection />, host));
+    expect(pills(host)[0].textContent).toBe("install failed");
+    expect(pills(host)[0].disabled).toBe(true);
+    expect(host.textContent).toContain("Quit and reopen Deck");
+    expect(host.textContent).toContain("Release Notes");
+    await act(async () => {
+      pills(host)[0].click();
+      pills(host)[1].click();
+    });
+    expect(updater.installAndRelaunch).not.toHaveBeenCalled();
+    expect(openUrl).toHaveBeenCalledOnce();
+  });
+
   it("shows the running version and offers a check when nothing was found", () => {
     activeUpdateController.value = controller();
     act(() => render(<AboutSection />, host));

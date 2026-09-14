@@ -108,6 +108,7 @@ export const CHANNELS = {
   updateCheck: "update_check",
   updateDownload: "update_download",
   updateInstall: "update_install",
+  updateReportError: "update_report_error",
   applySettingsPatch: "apply_settings_patch",
   suspendMenuAccelerators: "suspend_menu_accelerators",
   // File explorer. Every one of these is bounded to a workspace root by

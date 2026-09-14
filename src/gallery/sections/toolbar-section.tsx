@@ -16,6 +16,7 @@ import { shortcutLabel } from "../../lib/shortcut-label";
 import type { DesktopPlatform } from "../../lib/platform";
 import { FeatureToolbar } from "../../ui/toolbar/feature-toolbar";
 import type { ToolbarItem, ToolbarItemState } from "../../ui/toolbar/toolbar-item";
+import type { UpdateView } from "../../updater/update-controller";
 import { UpdateAction } from "../../updater/update-action";
 import { ExternalAppButton } from "../../ui/toolbar/external-app-button";
 import type { ExternalAppChoice } from "../../links/external-app-choices";
@@ -218,6 +219,12 @@ function BarFrame({ width, children }: { width: number; children: ComponentChild
 
 export function ToolbarSection() {
   const platform = useSignal<GalleryPlatform>("macos");
+  const failureView = useSignal<UpdateView>({
+    phase: "check-failed",
+    currentVersion: "",
+    availableVersion: "",
+    notes: "",
+  });
 
   return (
     <>
@@ -247,6 +254,34 @@ export function ToolbarSection() {
       </div>
 
       <Specimen
+        name="DECK-98 — update check failed"
+        note="Two consecutive failures · existing failed-action treatment · Retry checks again"
+        surface="bg"
+      >
+        <div class="gx-barpad" data-updater-failure-specimen>
+          {[720, 480].map((width) => (
+            <BarFrame key={width} width={width}>
+              <FeatureToolbar
+                items={toolbarItems(platform.value)}
+                updateAction={
+                  <UpdateAction
+                    view={failureView.value}
+                    platform={platform.value}
+                    onCheck={() => {
+                      failureView.value = { ...failureView.value, phase: "hidden" };
+                    }}
+                    onDownload={NOOP}
+                    onInstall={NOOP}
+                    onRelaunch={NOOP}
+                  />
+                }
+              />
+            </BarFrame>
+          ))}
+        </div>
+      </Specimen>
+
+      <Specimen
         name="FeatureToolbar — room for everything"
         note="Explorer active · Browser and Usage have no chord · the update pill rides in the global group"
         surface="bg"
@@ -263,6 +298,7 @@ export function ToolbarSection() {
                     availableVersion: "0.12.3",
                     notes: "Fixes the thing.",
                   }}
+                  onCheck={NOOP}
                   onDownload={NOOP}
                   onInstall={NOOP}
                   onRelaunch={NOOP}

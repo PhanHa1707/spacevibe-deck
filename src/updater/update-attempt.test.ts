@@ -84,7 +84,8 @@ describe("attemptMessage", () => {
     const message = attemptMessage({ kind: "incomplete", attempt })!;
     expect(message).toContain("0.11.0");
     expect(message).toContain("0.10.0");
-    expect(message).toContain("Download it manually");
+    expect(message).toContain("download the update manually");
+    expect(message).toContain("Release Notes");
     // Deck never saw the installer, so it must not claim a cause.
     expect(message).not.toMatch(/because|failed to|error/i);
   });

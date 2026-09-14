@@ -11,6 +11,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createUpdateLifecycle,
+  INSTALL_HANDOVER_TIMEOUT_MS,
+  InstallHandoverError,
   type AutoUpdaterLike,
   type UpdateCheckLike,
   type UpdateLifecycleDependencies,
@@ -501,7 +503,7 @@ describe("install", () => {
     expect(harness.lifecycle.isInstalling()).toBe(false);
   });
 
-  it("keeps standing aside when a late error lands on the shared channel", async () => {
+  it("keeps standing aside when a check is in flight on the shared channel", async () => {
     // The deadlock this guards: a peer window's failed check reported the
     // install as failed, `isInstalling()` went false while the installer was
     // still staging, and the census that had stood aside came back in force —
@@ -512,12 +514,95 @@ describe("install", () => {
     const settled = vi.fn();
     void installing.then(settled, settled);
     await vi.waitFor(() => expect(updater.quitAndInstallCalls.length).toBe(1));
+    updater.checkForUpdates = () => new Promise(() => {});
+    void lifecycle.check();
     updater.emit("error", new Error("feed unreachable"));
     await Promise.resolve();
 
     expect(settled).not.toHaveBeenCalled();
     expect(lifecycle.isInstalling()).toBe(true);
     expect(report).toHaveBeenCalledWith("Updater reported an error", expect.any(Error));
+  });
+
+  it("rejects a late staging error without allowing another handover", async () => {
+    const { lifecycle, updater } = await downloaded();
+    const failed = vi.fn();
+    void lifecycle.install().catch(failed);
+    await vi.waitFor(() => expect(updater.quitAndInstallCalls.length).toBe(1));
+    updater.emit("error", new Error("Squirrel could not verify the signature"));
+    await Promise.resolve();
+    expect(failed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Squirrel could not verify the signature",
+      }),
+    );
+    expect(lifecycle.isInstalling()).toBe(false);
+    await expect(lifecycle.install()).rejects.toThrow("already handed");
+  });
+
+  it("times out a silent handover and keeps it non-retryable", async () => {
+    vi.useFakeTimers();
+    try {
+      const { lifecycle, updater } = await downloaded();
+      const failed = vi.fn();
+      void lifecycle.install().catch(failed);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(lifecycle.isInstalling()).toBe(true);
+      await vi.advanceTimersByTimeAsync(INSTALL_HANDOVER_TIMEOUT_MS - 1);
+      expect(failed).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(failed).toHaveBeenCalledWith(expect.any(InstallHandoverError));
+      expect(lifecycle.isInstalling()).toBe(false);
+      await expect(lifecycle.install()).rejects.toThrow("already handed");
+      expect(updater.quitAndInstallCalls).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("attributes staging errors again after every overlapping check settles", async () => {
+    const { lifecycle, updater } = await downloaded();
+    const failed = vi.fn();
+    void lifecycle.install().catch(failed);
+    await vi.waitFor(() => expect(updater.quitAndInstallCalls).toHaveLength(1));
+    let finish!: () => void;
+    updater.checkForUpdates = () =>
+      new Promise((resolve) => {
+        finish = () => resolve(null);
+      });
+    const first = lifecycle.check();
+    const finishFirst = finish;
+    const second = lifecycle.check();
+    finishFirst();
+    await first;
+    updater.emit("error", new Error("check failed"));
+    expect(lifecycle.isInstalling()).toBe(true);
+    finish();
+    await second;
+    updater.emit("error", new Error("staging failed"));
+    await Promise.resolve();
+    expect(failed).toHaveBeenCalledWith(expect.any(InstallHandoverError));
+    expect(lifecycle.isInstalling()).toBe(false);
+  });
+
+  it("blocks peer downloads throughout installation and after a failed handover", async () => {
+    const { lifecycle, updater } = await downloaded();
+    const failed = vi.fn();
+    void lifecycle.install().catch(failed);
+    // Includes the preparation window, before quitAndInstall returns.
+    await expect(lifecycle.download()).rejects.toThrow("started installing");
+    await vi.waitFor(() => expect(updater.quitAndInstallCalls).toHaveLength(1));
+    updater.checkResult = { isUpdateAvailable: true, updateInfo: { version: "0.14.0" } };
+    await lifecycle.check();
+    await expect(lifecycle.download()).rejects.toThrow("started installing");
+    expect(updater.downloadCalls).toBe(1);
+    expect(lifecycle.isInstalling()).toBe(true);
+    expect(failed).not.toHaveBeenCalled();
+    updater.emit("error", new Error("staging failed"));
+    await Promise.resolve();
+    expect(lifecycle.isInstalling()).toBe(false);
+    await expect(lifecycle.download()).rejects.toThrow("started installing");
+    expect(updater.downloadCalls).toBe(1);
   });
 
   it("rejects when the handover is refused on the error channel, and stays retryable", async () => {
