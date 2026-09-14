@@ -17,6 +17,7 @@ import { runtimeFor, type AgentRuntimeDefault } from "../launcher/runtime-catalo
 import type { SignalAdapters } from "../lib/launch-augment";
 import { validateWorktreeColors, type WorktreeColors } from "./worktree-colors";
 import { validateQuickAgentIds } from "./quick-agents";
+import { SIGNAL_ADAPTERS_REVISION, signalChoicesAreCurrent } from "./signal-adapter-choice";
 import {
   NO_KEYBINDING_OVERRIDES,
   validateKeybindings,
@@ -172,6 +173,12 @@ export interface Settings {
    */
   agentSignalAdapters: SignalAdapters;
   /**
+   * Marks `agentSignalAdapters` as saved under the rule that a stored `true`
+   * is the user's choice. Always the current revision once validated; a file
+   * without it has every adapter reset to off (see signal-adapter-choice.ts).
+   */
+  signalAdaptersRevision: number;
+  /**
    * Whether Quick Launch opens with its prompt section expanded.
    *
    * The launcher draft carries a live `promptExpanded` too; THIS is the
@@ -265,6 +272,7 @@ export const DEFAULT_SETTINGS: Settings = {
   agentModels: {},
   agentRuntimeDefaults: {},
   agentSignalAdapters: { claude: false, codex: false, opencode: false },
+  signalAdaptersRevision: SIGNAL_ADAPTERS_REVISION,
   quickLaunchPromptExpanded: true,
   promptTemplates: [],
   browserHomeUrl: "http://localhost:3000",
@@ -519,12 +527,13 @@ function validateAgentRuntimeDefaults(raw: unknown): Readonly<Record<string, Age
 /**
  * Each adapter is off unless the stored value says `true` for it: an absent
  * key, a settings file from before the field, or a non-boolean all mean the
- * default, which is off. A stored boolean always wins, so a user who switched
- * an agent's signals on keeps them.
+ * default, which is off. A stored boolean wins only in a file saved under the
+ * current `signalAdaptersRevision`, so a user who switched an agent's signals
+ * on keeps them, while the unchosen `true`s a 1.1.x file carries do not.
  */
-function validateSignalAdapters(raw: unknown): SignalAdapters {
+function validateSignalAdapters(raw: unknown, current: boolean): SignalAdapters {
   const defaults = DEFAULT_SETTINGS.agentSignalAdapters;
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+  if (!current || typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return defaults;
   }
   const source = raw as Record<string, unknown>;
@@ -628,7 +637,11 @@ export function validateSettings(raw: unknown): Settings {
     worktreeColors: validateWorktreeColors(source.worktreeColors),
     agentModels: validateAgentModels(source.agentModels),
     agentRuntimeDefaults: validateAgentRuntimeDefaults(source.agentRuntimeDefaults),
-    agentSignalAdapters: validateSignalAdapters(source.agentSignalAdapters),
+    agentSignalAdapters: validateSignalAdapters(
+      source.agentSignalAdapters,
+      signalChoicesAreCurrent(source),
+    ),
+    signalAdaptersRevision: SIGNAL_ADAPTERS_REVISION,
     quickLaunchPromptExpanded:
       typeof source.quickLaunchPromptExpanded === "boolean"
         ? source.quickLaunchPromptExpanded

@@ -1,15 +1,10 @@
 /** Runtime ownership of Claude Signals; global registration is scoped to this script path. */
 import { writeClaudeHooksFiles, type ClaudeHooksFiles } from "./claude-hooks-file";
 import { claudeUserSettingsPath, syncClaudeUserSettings } from "./claude-user-settings";
+import { storedSignalAdapterOn } from "../../src/settings/signal-adapter-choice";
 
 export function claudeSignalsEnabled(settings: unknown): boolean {
-  if (typeof settings !== "object" || settings === null) return false;
-  const adapters = (settings as Record<string, unknown>).agentSignalAdapters;
-  return (
-    typeof adapters === "object" &&
-    adapters !== null &&
-    (adapters as Record<string, unknown>).claude === true
-  );
+  return storedSignalAdapterOn(settings, "claude");
 }
 
 interface IntegrationDeps {

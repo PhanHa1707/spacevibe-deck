@@ -9,11 +9,18 @@ import { parseHookBody } from "./hook-request";
 import { parseHookEvent, contractSignalOf } from "../../src/lib/agent-signal-map";
 import { createAgentAttentionTracker } from "../../src/terminal/agent-attention";
 import { buildEnv } from "../pty/spawn";
+import { SIGNAL_ADAPTERS_REVISION } from "../../src/settings/signal-adapter-choice";
 
 const scratch: string[] = [];
 const servers: HookServer[] = [];
-const on = { agentSignalAdapters: { codex: true } };
-const off = { agentSignalAdapters: { codex: false } };
+const on = {
+  signalAdaptersRevision: SIGNAL_ADAPTERS_REVISION,
+  agentSignalAdapters: { codex: true },
+};
+const off = {
+  signalAdaptersRevision: SIGNAL_ADAPTERS_REVISION,
+  agentSignalAdapters: { codex: false },
+};
 async function setup() {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "deck-codex-test-"));
   scratch.push(dir);

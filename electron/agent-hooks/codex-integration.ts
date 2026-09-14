@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { AGENT_HOOKS_DIR } from "./claude-hooks-file";
 import { codexHooksPath, syncCodexHooks } from "./codex-hooks";
+import { storedSignalAdapterOn } from "../../src/settings/signal-adapter-choice";
 
 export function codexHookScript(): string {
   return [
@@ -21,13 +22,7 @@ export function codexHookScript(): string {
 }
 
 export function codexSignalsEnabled(settings: unknown): boolean {
-  if (typeof settings !== "object" || settings === null) return false;
-  const adapters = (settings as Record<string, unknown>).agentSignalAdapters;
-  return (
-    typeof adapters === "object" &&
-    adapters !== null &&
-    (adapters as Record<string, unknown>).codex === true
-  );
+  return storedSignalAdapterOn(settings, "codex");
 }
 
 interface IntegrationDeps {

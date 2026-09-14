@@ -6,9 +6,16 @@ import { describe, expect, it, vi } from "vitest";
 import { createClaudeIntegration } from "./claude-integration";
 import { createHookServer, type HookEventPayload } from "./hook-server";
 import { managedHookCommand } from "./claude-user-settings";
+import { SIGNAL_ADAPTERS_REVISION } from "../../src/settings/signal-adapter-choice";
 
-const ON = { agentSignalAdapters: { claude: true } };
-const OFF = { agentSignalAdapters: { claude: false } };
+const ON = {
+  signalAdaptersRevision: SIGNAL_ADAPTERS_REVISION,
+  agentSignalAdapters: { claude: true },
+};
+const OFF = {
+  signalAdaptersRevision: SIGNAL_ADAPTERS_REVISION,
+  agentSignalAdapters: { claude: false },
+};
 const PATHS = { scriptPath: "/deck/hook.sh", settingsPath: "/deck/claude.json" };
 
 describe("Claude integration lifecycle", () => {
