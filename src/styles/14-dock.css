@@ -441,9 +441,11 @@
   padding: 5px 8px;
 }
 
-/* The hero (overview, DL §16) has no fixed width of its own beyond its
-   520px max — it already shrinks to fit a 360-560px column, so no override
-   is needed here. Listed for completeness: nothing to add. */
+/* DL-16: the Overview owns its internal spacing; the dock owns scrolling. */
+.usage-dock__section > .usage-overview {
+  padding: 0 4px;
+  box-sizing: border-box;
+}
 
 /* ── Sessions in the dock: the narrow-column layout ─────────────── */
 /* SessionsBody dock variant (src/ui/sessions/sessions-body.tsx).

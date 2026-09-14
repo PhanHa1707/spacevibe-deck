@@ -1,27 +1,18 @@
-import { type AgentTotal, agentTotals } from "../../../lib/usage-aggregate";
+import { type AgentTotal } from "../../../lib/usage-aggregate";
 import { AGENT_LOGOS } from "../../../lib/agent-logos";
 import { dotColor } from "../../../lib/process-info";
 import { formatUsd } from "../../../lib/usage-pricing";
-import { totalTokens } from "../../../lib/usage-snapshot";
-import { usageSnapshot } from "../../../usage/usage-store";
+import { totalTokens, type UsageBucket } from "../../../lib/usage-snapshot";
+import { usageSnapshot, usageLoading, usageStale } from "../../../usage/usage-store";
 import { activeUsageRange } from "../active-usage-view-store";
 import { UsageRangeSelector } from "../usage-range-selector";
-import { rangeSinceMs, USAGE_RANGES } from "../usage-ranges";
+import { USAGE_RANGES, type UsageRangeId } from "../usage-ranges";
+import { useMemo } from "preact/hooks";
+import { useAgentLimits, type AgentLimitsView } from "../use-agent-limits";
+import { RemainingAllowance } from "../remaining-allowance";
+import { CostTimeline } from "../cost-timeline";
+import { buildUsageTimeline } from "../usage-timeline";
 import { EM_DASH, ESTIMATE_NOTE, formatTokensCompact, USAGE_AGENT_LABEL } from "../usage-format";
-
-/**
- * The overview: one display figure saying what this machine's recorded agent
- * history would cost at list prices, then the accounting that adds up to it
- * (DL §16).
- *
- * It was a five-column table until 2026-08-10. The table answered "what are
- * the numbers"; the screen's actual question is "what is this costing me",
- * and that is one number with a breakdown, not a grid to be read across.
- *
- * "Recorded history" rather than "all-time" is not a stylistic choice — the
- * CLIs prune their own transcripts, so the figure is a floor, not a total, and
- * the copy must not promise otherwise (spec §Goal).
- */
 
 /** Shares are printed to one decimal, so the arithmetic runs in tenths. */
 const PERCENT_TENTHS = 1000;
@@ -182,82 +173,98 @@ function AgentRow({ block }: { readonly block: AgentBlock }) {
   );
 }
 
-export function OverviewSection() {
-  const buckets = usageSnapshot.value?.buckets ?? [];
+export interface OverviewContentProps {
+  readonly buckets: readonly UsageBucket[];
+  readonly range: UsageRangeId;
+  readonly onRangeChange: (range: UsageRangeId) => void;
+  readonly limits: AgentLimitsView;
+  readonly nowMs: number;
+  readonly loading?: boolean;
+  readonly stale?: boolean;
+}
 
-  // Nothing anywhere is its own state, not a $0.00 hero: a confident zero
-  // claims a measurement that was never made (DL-15.6's reasoning). No range
-  // selector either — there is nothing to scope, so the control would be a
-  // set of four buttons that all say the same thing.
-  if (agentTotals(buckets, null).length === 0) {
-    return <p class="usage-hero__empty">No data yet</p>;
-  }
-
-  // Unknown id can only come from a stale signal; fall back to the whole
-  // history rather than rendering a figure scoped to nothing in particular.
-  const range =
-    USAGE_RANGES.find((entry) => entry.id === activeUsageRange.value) ??
-    USAGE_RANGES[USAGE_RANGES.length - 1];
-  const recorded = agentTotals(buckets, rangeSinceMs(range, Date.now()));
-
+/** Injectable production markup; fixtures never mount the account-reading wrapper. */
+export function OverviewContent({
+  buckets,
+  range,
+  onRangeChange,
+  limits,
+  nowMs,
+  loading = false,
+  stale = false,
+}: OverviewContentProps) {
+  const timeline = useMemo(
+    () => buildUsageTimeline(buckets, range, nowMs),
+    [buckets, range, nowMs],
+  );
+  const recorded = timeline.agents;
   const total = pricedTotal(recorded);
   const blocks = buildBlocks(recorded, total);
-  // Scoped to the range on purpose: a model that went unpriced last month has
-  // nothing to do with a figure covering this week, and naming it there would
-  // be a disclosure about data the reader is not being shown.
   const unpriced = [...new Set(recorded.flatMap((entry) => entry.unpricedModels))].sort();
-
-  // Four footnotes for four honest situations. An EMPTY range has no models
-  // at all, so it gets none: `no price for ` with nothing after it was a real
-  // bug, and an asterisk explaining a dash is noise the empty line below
-  // already covers. With nothing priced the models are named outright. With a
-  // figure and a gap, the asterisk's "this is an estimate" is extended to say
-  // where the estimate stops — a partial sum is only acceptable while it
-  // admits it.
-  let footnote: string | null = "* if billed at full API rate";
-  if (blocks.length === 0) {
-    footnote = null;
-  } else if (total === null) {
-    footnote = `no price for ${unpriced.join(", ")}`;
-  } else if (unpriced.length > 0) {
-    const plural = unpriced.length === 1 ? "model" : "models";
-    footnote += ` · excludes ${unpriced.length} ${plural} with no published price`;
-  }
-
+  const definition = USAGE_RANGES.find((entry) => entry.id === range)!;
   return (
-    <div class="usage-hero">
-      {/* Sentence-case microcopy in --text-muted, no text-transform, no
-          tracking (DL-4.3, DL-16.2). */}
-      <p class="usage-hero__eyebrow">Raw token cost</p>
-      {/* The absent figure is faint, per DL-15.6's "em dash in --text-faint".
-          At 40px in --text-primary a bare dash stops reading as "unknown" and
-          starts reading as a rule across the page or a loading skeleton; the
-          faint step is what keeps it legible as an absence. Same size either
-          way, so the block below does not jump when a price lands. */}
-      <p class={`usage-hero__figure ${total === null ? "usage-hero__figure--absent" : ""}`}>
-        {total === null ? EM_DASH : `${formatUsd(total)}*`}
-      </p>
-      {footnote === null ? null : <p class="usage-hero__footnote">{footnote}</p>}
-      {/* The period the figure covers (DL-16.7). This REPLACED a standalone
-          `today · $X · N tokens` line on 2026-08-10 — do not restore it as a
-          "fix". The spec's "today and recorded history" is still satisfied,
-          one click apart, and two totals printed at once contradict each
-          other the moment they differ. */}
-      <UsageRangeSelector />
-      <p class="usage-hero__estimate">{ESTIMATE_NOTE}</p>
-
-      {blocks.length === 0 ? (
-        // The range is empty, but the corpus is not. Say WHICH period is
-        // empty (DL-16.7) and keep the selector above reachable, or the
-        // reader is stranded on a screen that looks broken.
-        <p class="usage-hero__empty">{range.emptyLabel}</p>
-      ) : (
-        <ul class="usage-hero__agents">
-          {blocks.map((block) => (
-            <AgentRow key={block.agent} block={block} />
-          ))}
-        </ul>
-      )}
+    <div class="usage-overview">
+      <RemainingAllowance {...limits} />
+      <UsageRangeSelector value={range} onChange={onRangeChange} />
+      {loading && !buckets.length ? (
+        <p class="usage-overview__note" role="status">
+          Reading recorded token history…
+        </p>
+      ) : null}
+      {stale ? (
+        <p class="usage-overview__note" role="status">
+          Cost history is stale — showing the last good read
+        </p>
+      ) : null}
+      <CostTimeline timeline={timeline} />
+      <section class="usage-hero" aria-label="Estimated API cost">
+        <p class="usage-hero__eyebrow">Estimated API cost</p>
+        <p class={`usage-hero__figure ${total === null ? "usage-hero__figure--absent" : ""}`}>
+          {total === null ? EM_DASH : formatUsd(total)}
+        </p>
+        <p class="usage-hero__footnote">API equivalent, not your subscription bill</p>
+        {unpriced.length > 0 && (
+          <p class="usage-hero__footnote">
+            {total === null ? "No priced data" : "Partial estimate"} · excludes {unpriced.length}{" "}
+            {unpriced.length === 1 ? "model" : "models"} with no published price
+          </p>
+        )}
+        {blocks.length === 0 ? (
+          <p class="usage-hero__empty">{definition.emptyLabel}</p>
+        ) : (
+          <ul class="usage-hero__agents">
+            {blocks.map((block) => (
+              <AgentRow key={block.agent} block={block} />
+            ))}
+          </ul>
+        )}
+        <details class="usage-overview__details">
+          <summary>Pricing details</summary>
+          <p>{ESTIMATE_NOTE}</p>
+          <p>This machine’s recorded history only; agent CLIs may prune older transcripts.</p>
+          {unpriced.length > 0 && (
+            <p>No price for {unpriced.join(", ")}. These tokens are excluded from the estimate.</p>
+          )}
+        </details>
+      </section>
     </div>
+  );
+}
+
+export function OverviewSection() {
+  const limits = useAgentLimits();
+  const range = USAGE_RANGES.find((entry) => entry.id === activeUsageRange.value)?.id ?? "all";
+  return (
+    <OverviewContent
+      buckets={usageSnapshot.value?.buckets ?? []}
+      range={range}
+      onRangeChange={(next) => {
+        activeUsageRange.value = next;
+      }}
+      limits={limits}
+      nowMs={limits.nowMs}
+      loading={usageLoading.value}
+      stale={usageStale.value}
+    />
   );
 }

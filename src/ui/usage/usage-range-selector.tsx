@@ -1,10 +1,9 @@
 import { useRef } from "preact/hooks";
 import { activeUsageRange } from "./active-usage-view-store";
-import { USAGE_RANGES } from "./usage-ranges";
+import { USAGE_RANGES, type UsageRangeId } from "./usage-ranges";
 
 /**
- * The period the display figure covers (DL-16.7) — the only control this
- * screen has, and the only one it is allowed.
+ * The cost period shared by the timeline and accounting (DL-16.7).
  *
  * Segmented rather than a §6 `cycle` pill on purpose: every period is visible
  * at once because the set of available comparisons is itself information, and
@@ -20,11 +19,16 @@ import { USAGE_RANGES } from "./usage-ranges";
  * Selection writes a module signal that is never persisted (see
  * `active-usage-view-store.ts`).
  */
-export function UsageRangeSelector() {
+export function UsageRangeSelector({
+  value = activeUsageRange.value,
+  onChange = (next) => {
+    activeUsageRange.value = next;
+  },
+}: { readonly value?: UsageRangeId; readonly onChange?: (range: UsageRangeId) => void } = {}) {
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const selectRange = (index: number): void => {
-    activeUsageRange.value = USAGE_RANGES[index].id;
+    onChange(USAGE_RANGES[index].id);
     itemRefs.current[index]?.focus();
   };
 
@@ -39,7 +43,7 @@ export function UsageRangeSelector() {
     }
     event.preventDefault();
     const length = USAGE_RANGES.length;
-    const currentIndex = USAGE_RANGES.findIndex((range) => range.id === activeUsageRange.value);
+    const currentIndex = USAGE_RANGES.findIndex((range) => range.id === value);
     const from = currentIndex === -1 ? 0 : currentIndex;
     selectRange((from + step + length) % length);
   };
@@ -47,7 +51,7 @@ export function UsageRangeSelector() {
   return (
     <div class="usage-range" role="tablist" aria-label="Cost range" onKeyDown={handleKeyDown}>
       {USAGE_RANGES.map((range, index) => {
-        const isActive = range.id === activeUsageRange.value;
+        const isActive = range.id === value;
         return (
           <button
             key={range.id}

@@ -1,13 +1,11 @@
 import { AgentGlyph } from "../controls/agent-glyph";
 import { EM_DASH, USAGE_AGENT_LABEL, USAGE_AGENT_ORDER } from "./usage-format";
-import { useEffect, useState } from "preact/hooks";
+import { useAgentLimits } from "./use-agent-limits";
 import {
   currentLimitWindows,
   limitWindowLabel,
-  LIMIT_MAX_AGE_MS,
   type AgentLimitsSnapshot,
 } from "../../lib/agent-limits";
-import { agentLimits, observeAgentLimits } from "../../usage/agent-limits-store";
 
 interface AgentUsageSummaryProps {
   readonly onOpenUsage: () => void;
@@ -71,21 +69,7 @@ export function AgentUsageSummary({
 
 /** Expire a reading at its boundary even when the network is idle or unavailable. */
 export function RailAgentLimits({ onOpenUsage }: Pick<AgentUsageSummaryProps, "onOpenUsage">) {
-  const [nowMs, setNowMs] = useState(Date.now());
-  const snapshot = agentLimits.value;
-  useEffect(() => observeAgentLimits(), []);
-  useEffect(() => {
-    const current = Date.now();
-    const boundaries = snapshot
-      .flatMap((row) => [
-        row.observedAtMs + LIMIT_MAX_AGE_MS + 1,
-        ...row.windows.map((window) => window.resetsAtMs),
-      ])
-      .filter((at) => at > current);
-    if (!boundaries.length) return;
-    const timer = setTimeout(() => setNowMs(Date.now()), Math.min(...boundaries) - current);
-    return () => clearTimeout(timer);
-  }, [snapshot, nowMs]);
+  const { snapshot, nowMs } = useAgentLimits();
   return (
     <AgentUsageSummary
       snapshot={snapshot}

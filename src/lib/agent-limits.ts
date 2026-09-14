@@ -46,7 +46,8 @@ export function parseLimitWindow(
     !Number.isSafeInteger(duration) ||
     !finite(resetsSeconds) ||
     resetsSeconds <= 0 ||
-    !Number.isSafeInteger(resetsSeconds * 1000)
+    !Number.isSafeInteger(resetsSeconds * 1000) ||
+    !Number.isFinite(new Date(resetsSeconds * 1000).getTime())
   )
     return null;
   return { usedPercent: used, durationMinutes: duration, resetsAtMs: resetsSeconds * 1000 };

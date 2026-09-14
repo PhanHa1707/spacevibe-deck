@@ -65,7 +65,8 @@ describe("OverviewSection", () => {
     });
   };
 
-  const text = (selector: string): string => host.querySelector(selector)?.textContent ?? "";
+  const text = (selector: string): string =>
+    [...host.querySelectorAll(selector)].map((node) => node.textContent).join(" ");
 
   const blocks = (): HTMLElement[] => [...host.querySelectorAll<HTMLElement>(".usage-agent")];
 
@@ -93,10 +94,10 @@ describe("OverviewSection", () => {
     mount();
 
     // Sentence-case microcopy, no text-transform, no tracking (DL-4.3, DL-16.2).
-    expect(text(".usage-hero__eyebrow")).toBe("Raw token cost");
+    expect(text(".usage-hero__eyebrow")).toBe("Estimated API cost");
     // claude 1M input @ $5/M = $5.00, codex 1M @ $1.25/M = $1.25 → $6.25.
-    expect(text(".usage-hero__figure")).toBe("$6.25*");
-    expect(text(".usage-hero__footnote")).toBe("* if billed at full API rate");
+    expect(text(".usage-hero__figure")).toBe("$6.25");
+    expect(text(".usage-hero__footnote")).toBe("API equivalent, not your subscription bill");
   });
 
   it("carries exactly one display figure (DL-16.1)", () => {
@@ -117,7 +118,7 @@ describe("OverviewSection", () => {
   it("carries the estimate disclaimer and the pricing snapshot date", () => {
     usageSnapshot.value = priced();
     mount();
-    const note = text(".usage-hero__estimate");
+    const note = text(".usage-hero .usage-overview__details");
     expect(note).toContain("estimated at API prices");
     expect(note).toContain(PRICING_SNAPSHOT_DATE);
   });
@@ -191,18 +192,15 @@ describe("OverviewSection", () => {
     ).toHaveLength(0);
   });
 
-  it("permits the range selector and nothing else to be interactive (DL-16.7)", () => {
+  it("allows range selection and keyboard-accessible data disclosures (DL-16.7)", () => {
     usageSnapshot.value = priced();
     mount();
-    const interactive = [
-      ...host.querySelectorAll('button, a, input, select, [role="button"], [tabindex]'),
-    ];
-    // Every focusable thing here is a range option — one control, with no
-    // second one smuggled in beside it.
-    expect(interactive.length).toBeGreaterThan(0);
-    for (const node of interactive) {
-      expect(node.classList.contains("usage-range__option")).toBe(true);
-    }
+    expect(host.querySelectorAll(".usage-range__option")).toHaveLength(4);
+    expect([...host.querySelectorAll("summary")].map((node) => node.textContent)).toEqual([
+      "Chart data",
+      "Pricing details",
+    ]);
+    expect(host.querySelectorAll("input, select, a")).toHaveLength(0);
   });
 
   it("never overclaims what the numbers cover", () => {
@@ -239,14 +237,14 @@ describe("OverviewSection", () => {
       usageSnapshot.value = partly();
       mount();
       // $5.00 of Claude + $1.25 of priced Codex.
-      expect(text(".usage-hero__figure")).toBe("$6.25*");
+      expect(text(".usage-hero__figure")).toBe("$6.25");
     });
 
     it("discloses the gap in the footnote", () => {
       usageSnapshot.value = partly();
       mount();
       expect(text(".usage-hero__footnote")).toBe(
-        "* if billed at full API rate · excludes 1 model with no published price",
+        "API equivalent, not your subscription bill Partial estimate · excludes 1 model with no published price",
       );
     });
 
@@ -270,7 +268,7 @@ describe("OverviewSection", () => {
       ]);
       mount();
       expect(text(".usage-hero__footnote")).toBe(
-        "* if billed at full API rate · excludes 2 models with no published price",
+        "API equivalent, not your subscription bill Partial estimate · excludes 2 models with no published price",
       );
     });
 
@@ -325,7 +323,7 @@ describe("OverviewSection", () => {
     it("still reports the rest of the machine's cost", () => {
       usageSnapshot.value = noneForCodex();
       mount();
-      expect(text(".usage-hero__figure")).toBe("$5.00*");
+      expect(text(".usage-hero__figure")).toBe("$5.00");
       const claude = blocks().find(
         (block) => blockText(block, ".usage-agent__label") === "Claude Code",
       ) as HTMLElement;
@@ -362,7 +360,9 @@ describe("OverviewSection", () => {
       mount();
       // There is no priced part to stand behind, so there is no figure.
       expect(text(".usage-hero__figure")).toBe(EM_DASH);
-      expect(text(".usage-hero__footnote")).toBe("no price for mystery-one, mystery-two");
+      expect(text(".usage-hero .usage-overview__details")).toContain(
+        "No price for mystery-one, mystery-two",
+      );
     });
 
     it("marks the absent figure faint so it does not read as a rule (DL-15.6)", () => {
@@ -434,7 +434,7 @@ describe("OverviewSection", () => {
       expect(
         [...host.querySelectorAll(".usage-range__option")].map((node) => node.textContent),
       ).toEqual(USAGE_RANGES.map((range) => range.label));
-      expect(text(".usage-hero__figure")).toBe("$16.25*");
+      expect(text(".usage-hero__figure")).toBe("$16.25");
     });
 
     it("recomputes the figure on local calendar-day boundaries", () => {
@@ -442,16 +442,16 @@ describe("OverviewSection", () => {
       mount();
 
       pick("Today");
-      expect(text(".usage-hero__figure")).toBe("$5.00*");
+      expect(text(".usage-hero__figure")).toBe("$5.00");
 
       pick("7 days");
-      expect(text(".usage-hero__figure")).toBe("$10.00*");
+      expect(text(".usage-hero__figure")).toBe("$10.00");
 
       pick("30 days");
-      expect(text(".usage-hero__figure")).toBe("$15.00*");
+      expect(text(".usage-hero__figure")).toBe("$15.00");
 
       pick("All");
-      expect(text(".usage-hero__figure")).toBe("$16.25*");
+      expect(text(".usage-hero__figure")).toBe("$16.25");
     });
 
     it("recomputes each agent's amount, share and token count", () => {
@@ -498,7 +498,7 @@ describe("OverviewSection", () => {
 
       pick("7 days");
       // ...but inside 7 days it did not happen, so naming it would be a lie.
-      expect(text(".usage-hero__footnote")).toBe("* if billed at full API rate");
+      expect(text(".usage-hero__footnote")).toBe("API equivalent, not your subscription bill");
     });
 
     describe("when the chosen range holds nothing", () => {
@@ -522,10 +522,10 @@ describe("OverviewSection", () => {
         mount();
         pick("Today");
         expect(blocks()).toHaveLength(0);
-        expect(text(".usage-hero__empty")).toBe("No usage today");
+        expect(text(".usage-hero .usage-hero__empty")).toBe("No usage today");
 
         pick("7 days");
-        expect(text(".usage-hero__empty")).toBe("No usage in the last 7 local days");
+        expect(text(".usage-hero .usage-hero__empty")).toBe("No usage in the last 7 local days");
       });
 
       it("prints no dangling footnote — there are no models to name", () => {
@@ -534,7 +534,7 @@ describe("OverviewSection", () => {
         pick("Today");
         // `no price for ` with nothing after it was a real bug: an empty
         // range has no models at all, priced or otherwise.
-        expect(host.querySelector(".usage-hero__footnote")).toBeNull();
+        expect(text(".usage-hero__footnote")).toBe("API equivalent, not your subscription bill");
         expect(host.textContent).not.toContain("no price for");
       });
 
@@ -544,15 +544,16 @@ describe("OverviewSection", () => {
         pick("Today");
         expect(host.querySelectorAll(".usage-range__option")).toHaveLength(USAGE_RANGES.length);
         pick("All");
-        expect(text(".usage-hero__figure")).toBe("$5.00*");
+        expect(text(".usage-hero__figure")).toBe("$5.00");
       });
     });
   });
 
   it("shows the no-data treatment rather than a $0.00 hero", () => {
     mount();
-    expect(text(".usage-hero__empty")).toBe("No data yet");
-    expect(host.querySelector(".usage-hero__figure")).toBeNull();
+    expect(text(".usage-hero .usage-hero__empty")).toBe("No data yet");
+    expect(text(".usage-hero__figure")).toBe(EM_DASH);
+    expect(host.querySelector(".usage-allowance")).not.toBeNull();
     expect(host.textContent).not.toContain("$0.00");
   });
 });

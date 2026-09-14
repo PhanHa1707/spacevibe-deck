@@ -53,6 +53,17 @@ describe("subscription limit readings", () => {
     );
     expect(currentLimitWindows(reading, NOW - 1)).toEqual([]);
   });
+  it("rejects reset timestamps outside the JavaScript Date range", () => {
+    const snapshot = parseLimitsSnapshot([
+      {
+        agent: "claude",
+        state: "ready",
+        observedAtMs: NOW,
+        windows: [{ usedPercent: 32, durationMinutes: 300, resetsAtMs: 9_000_000_000_000_000 }],
+      },
+    ]);
+    expect(currentLimitWindows(snapshot[0], NOW)).toEqual([]);
+  });
   it("rejects invalid percentages, durations and timestamps at both boundaries", () => {
     for (const used of [-1, 101, "82", null, Infinity, NaN]) {
       expect(

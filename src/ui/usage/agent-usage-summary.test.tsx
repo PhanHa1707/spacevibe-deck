@@ -6,7 +6,13 @@ import { LIMIT_MAX_AGE_MS } from "../../lib/agent-limits";
 
 vi.mock("../../usage/agent-limits-store", async () => {
   const { signal } = await import("@preact/signals");
-  return { agentLimits: signal([]), observeAgentLimits: vi.fn(() => vi.fn()) };
+  return {
+    agentLimits: signal([]),
+    agentLimitsAvailable: true,
+    agentLimitsLoading: signal(false),
+    agentLimitsError: signal(false),
+    observeAgentLimits: vi.fn(() => vi.fn()),
+  };
 });
 const { RailAgentLimits } = await import("./agent-usage-summary");
 const { agentLimits, observeAgentLimits } = await import("../../usage/agent-limits-store");
