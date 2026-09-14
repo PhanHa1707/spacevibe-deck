@@ -1,6 +1,7 @@
 import { renderAgentStrip } from "../agent-strip.js";
 import { BRAND_ICON_SRC, renderStagePane, renderStageRail, renderStageStrip } from "../appwin.js";
 import { RELEASES_URL, REPO_URL, WINDOWS_FALLBACK_URL } from "../download-links.js";
+import { renderHeroFeedbackPill } from "../hero-feedback.js";
 import { renderQuickInstall } from "../install-command.js";
 import { renderAppleIcon, renderWindowsIcon } from "../os-icons.js";
 import { CHANGELOG_URL, FEEDBACK_URL, LANDING_URL } from "../site-urls.js";
@@ -181,11 +182,14 @@ export function renderDirectionA(copy) {
             <!-- A launch marker, not a package-version readout: the exact
                  build remains in the changelog this links to, while the hero
                  announces the product milestone visitors need to remember. -->
-            <a class="a-hero__pill" href="${CHANGELOG_URL}">
-              <span class="a-cta-tag a-cta-new__tag" data-copy="newBadge">${copy.newBadge}</span>
-              <span class="a-hero__pill-text" data-copy="releaseLabel">${copy.releaseLabel}</span>
-              <span class="a-hero__pill-arrow" aria-hidden="true">→</span>
-            </a>
+            <div class="a-hero__pills">
+              <a class="a-hero__pill" href="${CHANGELOG_URL}">
+                <span class="a-cta-tag a-cta-new__tag" data-copy="newBadge">${copy.newBadge}</span>
+                <span class="a-hero__pill-text" data-copy="releaseLabel">${copy.releaseLabel}</span>
+                <span class="a-hero__pill-arrow" aria-hidden="true">→</span>
+              </a>
+              ${renderHeroFeedbackPill(copy)}
+            </div>
 
             <div class="a-hero__copy">
               <h1>

@@ -28,6 +28,7 @@ export const messages = {
     changelogViewRelease: "View release",
     localeLabel: "Language",
     navFeedback: "Feedback",
+    heroFeedbackBoard: "Feedback board",
     feedbackTitle: "Feedback",
     feedbackIntro:
       "Hit a bug, or wish Deck did something new? Tell us. Accepted requests show up on the board and move along as we work on them.",
@@ -150,6 +151,7 @@ export const messages = {
     changelogViewRelease: "Xem bản phát hành",
     localeLabel: "Ngôn ngữ",
     navFeedback: "Góp ý",
+    heroFeedbackBoard: "Bảng góp ý",
     feedbackTitle: "Góp ý",
     feedbackIntro:
       "Gặp lỗi, hay muốn Deck làm thêm điều gì? Cứ kể cho chúng tôi. Góp ý được duyệt sẽ lên bảng và đi dần qua các cột theo tiến độ.",

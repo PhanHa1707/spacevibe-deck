@@ -8,6 +8,7 @@ import "../styles/scenes.css";
 import "../styles/hero-cursor.css";
 import "../styles/hero-recolor.css";
 import "../styles/release-modal.css";
+import "../styles/hero-feedback.css";
 
 import { messages } from "./copy.js";
 import { renderDirectionA } from "./directions/a.js";
