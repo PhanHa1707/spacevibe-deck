@@ -61,6 +61,12 @@ export const messages = {
     feedbackColumnDone: "Done",
     feedbackLoading: "Loading the board…",
     feedbackError: "Could not load the board.",
+    feedbackClosedNotice:
+      "Sending opens soon. Whatever you write here is kept on this device, so it will be waiting for you.",
+    feedbackSubmitClosed: "Sending opens soon",
+    feedbackDraftSaved: "Draft saved on this device",
+    feedbackDraftRefused: "This browser will not keep a draft. Copy your text before you leave.",
+    feedbackBoardSoon: "The board appears once sending opens.",
     panelRestoreTitle: "Close it. Reopen it. Nothing lost the thread.",
     panelRestoreBody:
       "Deck brings back every tab and pane, then types each agent's own resume command — claude --resume, codex resume, opencode -s. The conversation carries on from where it stopped.",
@@ -185,6 +191,12 @@ export const messages = {
     feedbackColumnDone: "Đã xong",
     feedbackLoading: "Đang tải bảng…",
     feedbackError: "Không tải được bảng.",
+    feedbackClosedNotice:
+      "Sắp mở gửi góp ý. Những gì bạn viết ở đây được giữ lại trên máy này, nên lúc mở gửi nó vẫn còn nguyên.",
+    feedbackSubmitClosed: "Sắp mở gửi",
+    feedbackDraftSaved: "Đã lưu nháp trên máy này",
+    feedbackDraftRefused: "Trình duyệt này không cho lưu nháp. Hãy chép lại nội dung trước khi rời trang.",
+    feedbackBoardSoon: "Bảng sẽ hiện khi mở gửi góp ý.",
     panelRestoreTitle: "Đóng rồi mở lại. Không mất mạch nào.",
     panelRestoreBody:
       "Deck dựng lại mọi tab và pane, rồi tự gõ đúng lệnh resume của từng agent — claude --resume, codex resume, opencode -s. Cuộc hội thoại chạy tiếp từ chỗ nó dừng.",

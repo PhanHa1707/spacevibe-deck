@@ -425,6 +425,49 @@ legend.feedback-label {
   font: 500 0.72rem/1 var(--font-mono);
 }
 
+/* Holding mode (DECK-101): sending is closed, the draft stays on the device. */
+.feedback-closed {
+  margin: 0;
+  padding: 0.8rem 0.95rem;
+  border-radius: var(--fb-radius-md);
+  color: var(--log-ink);
+  background: color-mix(in srgb, var(--fb-review) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fb-review) 30%, transparent);
+  font: 500 0.84rem/1.5 var(--font-display);
+}
+
+.feedback-closed[hidden] {
+  display: none;
+}
+
+.feedback-composer[data-closed] .feedback-submit:disabled {
+  cursor: not-allowed;
+}
+
+.feedback-composer[data-closed] .feedback-kbd {
+  display: none;
+}
+
+.feedback-draft {
+  color: var(--log-ink-faint);
+  font: 500 0.76rem/1.3 var(--font-display);
+}
+
+.feedback-draft[data-state="saved"]::before {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-right: 0.45rem;
+  border-radius: 50%;
+  background: var(--fb-done);
+  content: "";
+  vertical-align: 0.06em;
+}
+
+.feedback-draft[data-state="refused"] {
+  color: #ffc4ba;
+}
+
 .feedback-sent {
   display: grid;
   justify-items: center;

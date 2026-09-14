@@ -8,6 +8,7 @@ import { messages } from "./copy.js";
 import {
   BODY_MAX,
   FeedbackSubmitError,
+  SUBMISSIONS_OPEN,
   TITLE_MAX,
   TITLE_MIN,
   fetchFeedbackBoard,
@@ -15,13 +16,23 @@ import {
 } from "./feedback-api.js";
 import {
   renderBoard,
+  renderBoardClosed,
   renderBoardError,
   renderBoardLoading,
   selectBoardColumn,
 } from "./feedback-board-view.js";
-import { resetComposer, setComposerState, updateFormMeters } from "./feedback-form-view.js";
+import { clearDraft, readDraft, writeDraft } from "./feedback-draft.js";
+import {
+  fillForm,
+  renderDraftStatus,
+  resetComposer,
+  setComposerClosed,
+  setComposerState,
+  updateFormMeters,
+} from "./feedback-form-view.js";
 import { renderFeedbackShell, updateFeedbackLocale } from "./feedback-view.js";
 import { LOCALES, readLocale, writeLocale } from "./locale-state.js";
+import { safeLocalStorage } from "./safe-storage.js";
 
 const SUBMIT_ERROR_COPY = {
   invalid: "feedbackErrorInvalid",
@@ -32,7 +43,9 @@ const SUBMIT_ERROR_COPY = {
 // Review-only switch, live under `npm run prototype:landing` alone: `?demo`
 // swaps the Worker for fixtures (see feedback-demo.js).
 const params = new URLSearchParams(window.location.search);
+const submissionsOpen = SUBMISSIONS_OPEN || (import.meta.env.DEV && params.has("demo"));
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.userAgent);
+const storage = safeLocalStorage();
 
 const root = document.querySelector("#feedback-root");
 
@@ -85,7 +98,23 @@ function readForm() {
   };
 }
 
+/** Keep exactly what was typed, so the later confirm step sends it unchanged. */
+function saveDraft() {
+  const data = new FormData(form);
+  const state = writeDraft(storage, {
+    title: String(data.get("title") ?? ""),
+    body: String(data.get("body") ?? ""),
+    category: String(data.get("category") ?? ""),
+  });
+  renderDraftStatus(root, state, messages[locale]);
+}
+
 async function handleSubmit() {
+  // Cmd/Ctrl+Enter calls requestSubmit(), which a disabled button cannot stop.
+  if (!submissionsOpen) {
+    return;
+  }
+
   const input = readForm();
 
   if (
@@ -103,6 +132,8 @@ async function handleSubmit() {
   try {
     await api.submit(input);
     form.reset();
+    clearDraft(storage);
+    renderDraftStatus(root, "empty", messages[locale]);
     updateFormMeters(form);
     setComposerState(root, "sent", null, messages[locale]);
     root.querySelector("[data-send-another]")?.focus();
@@ -117,7 +148,10 @@ form.addEventListener("submit", (event) => {
   void handleSubmit();
 });
 
-form.addEventListener("input", () => updateFormMeters(form));
+form.addEventListener("input", () => {
+  updateFormMeters(form);
+  saveDraft();
+});
 
 form.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -155,12 +189,27 @@ root.addEventListener("click", (event) => {
 });
 
 async function start() {
+  const draft = readDraft(storage);
+
+  if (draft) {
+    fillForm(form, draft);
+    renderDraftStatus(root, "saved", messages[locale]);
+  }
+
+  updateFormMeters(form);
+
+  // Closed: no board to fetch and nothing to send — the Worker is not live.
+  if (!submissionsOpen) {
+    setComposerClosed(root, messages[locale]);
+    renderBoardClosed(root, messages[locale]);
+    return;
+  }
+
   if (import.meta.env.DEV && params.has("demo")) {
     const { createDemoFeedbackApi } = await import("./feedback-demo.js");
     api = createDemoFeedbackApi(params.get("demo"));
   }
 
-  updateFormMeters(form);
   await loadBoard();
 }
 

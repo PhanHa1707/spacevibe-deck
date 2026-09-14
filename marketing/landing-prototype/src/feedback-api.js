@@ -6,6 +6,13 @@
 
 export const FEEDBACK_API_URL = "https://api.deck.spacevibe.dev/v1/feedback";
 
+/**
+ * Closed until the Worker's feedback routes ship with their Linear key
+ * (DECK-101): until then the page keeps a draft on the device and never calls
+ * the API. Flip to true in the same change that deploys the Worker.
+ */
+export const SUBMISSIONS_OPEN = false;
+
 /** Board columns, left to right. */
 export const FEEDBACK_STATUSES = ["pending", "review", "done"];
 

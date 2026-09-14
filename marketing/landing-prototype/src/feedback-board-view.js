@@ -139,7 +139,7 @@ function columnParts(root, status) {
   return { list, count, tabCount };
 }
 
-function setBoardStatus(root, state, copyKey, copy) {
+function setBoardStatus(root, state, copyKey, copy, retryable = false) {
   const board = root.querySelector(".feedback-board");
   const status = root.querySelector("[data-board-status]");
 
@@ -158,6 +158,11 @@ function setBoardStatus(root, state, copyKey, copy) {
 
   status.dataset.copy = copyKey;
   status.replaceChildren(document.createTextNode(copy[copyKey]));
+
+  if (!retryable) {
+    return;
+  }
+
   const retry = document.createElement("button");
   retry.type = "button";
   retry.className = "feedback-pill feedback-pill--ghost feedback-pill--small";
@@ -183,7 +188,19 @@ export function renderBoardError(root, copy) {
     columnParts(root, status).list.replaceChildren();
   }
 
-  setBoardStatus(root, "error", "feedbackError", copy);
+  setBoardStatus(root, "error", "feedbackError", copy, true);
+}
+
+/** Sending is closed, so there is no board to fetch yet: say when it comes. */
+export function renderBoardClosed(root, copy) {
+  for (const status of FEEDBACK_STATUSES) {
+    const { list, count, tabCount } = columnParts(root, status);
+    count.textContent = "";
+    tabCount.textContent = "";
+    list.replaceChildren(createEmpty(status, copy));
+  }
+
+  setBoardStatus(root, "closed", "feedbackBoardSoon", copy);
 }
 
 export function renderBoard(root, board, copy, locale) {

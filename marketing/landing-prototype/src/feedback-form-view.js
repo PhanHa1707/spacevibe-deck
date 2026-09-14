@@ -26,6 +26,8 @@ function renderTypes(copy) {
 function renderForm(copy) {
   return `
     <form class="feedback-form" novalidate aria-labelledby="feedback-form-title">
+      <p class="feedback-closed" data-closed-notice hidden data-copy="feedbackClosedNotice">${copy.feedbackClosedNotice}</p>
+
       <fieldset class="feedback-field">
         <legend class="feedback-label" data-copy="feedbackCategoryLabel">${copy.feedbackCategoryLabel}</legend>
         <div class="feedback-types">${renderTypes(copy)}</div>
@@ -80,6 +82,7 @@ function renderForm(copy) {
           ${SEND_ICON}
         </button>
         <kbd class="feedback-kbd" data-shortcut aria-hidden="true"></kbd>
+        <span class="feedback-draft" data-draft-status role="status" aria-live="polite"></span>
       </div>
     </form>
   `;
@@ -162,6 +165,67 @@ export function setComposerState(root, state, copyKey, copy) {
 
   result.dataset.copy = copyKey;
   result.textContent = copy[copyKey];
+}
+
+const DRAFT_COPY = { saved: "feedbackDraftSaved", refused: "feedbackDraftRefused" };
+
+/** Put a saved draft back into the fields. */
+export function fillForm(form, draft) {
+  const title = form.querySelector('[name="title"]');
+  const body = form.querySelector('[name="body"]');
+  const category = form.querySelector(`[name="category"][value="${draft.category}"]`);
+
+  if (title) {
+    title.value = draft.title;
+  }
+
+  if (body) {
+    body.value = draft.body;
+  }
+
+  if (category) {
+    category.checked = true;
+  }
+
+  updateFormMeters(form);
+}
+
+/** @param {"saved" | "empty" | "refused"} state */
+export function renderDraftStatus(root, state, copy) {
+  const status = root.querySelector("[data-draft-status]");
+
+  if (!status) {
+    throw new Error("Feedback draft status is missing.");
+  }
+
+  status.dataset.state = state;
+
+  if (state === "empty") {
+    delete status.dataset.copy;
+    status.textContent = "";
+    return;
+  }
+
+  status.dataset.copy = DRAFT_COPY[state];
+  status.textContent = copy[DRAFT_COPY[state]];
+}
+
+/** Sending is closed: say so, and keep the button visibly off. */
+export function setComposerClosed(root, copy) {
+  const composer = root.querySelector(".feedback-composer");
+  const notice = composer?.querySelector("[data-closed-notice]");
+  const submit = composer?.querySelector(".feedback-submit");
+  const label = submit?.querySelector("[data-submit-label]");
+
+  if (!composer || !notice || !submit || !label) {
+    throw new Error("Feedback composer is missing.");
+  }
+
+  composer.dataset.closed = "";
+  notice.hidden = false;
+  submit.disabled = true;
+  label.dataset.copy = "feedbackSubmitClosed";
+  label.textContent = copy.feedbackSubmitClosed;
 }
 
 export function resetComposer(root, copy) {
