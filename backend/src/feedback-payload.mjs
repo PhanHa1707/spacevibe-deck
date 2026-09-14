@@ -1,14 +1,18 @@
-import { PayloadError, readJsonBody } from "./payload.mjs";
+import { PayloadError, UUID_V4, readJsonBody } from "./payload.mjs";
 
 /** The public feedback form's wire contract (DECK-101), mirrored by the landing. */
-export const FEEDBACK_BODY_LIMIT = 4096;
+// Room for the full 2,000 characters in any script: the worst case, a control
+// character escaped as \uXXXX, is 6 bytes per UTF-16 unit — about 12.8 KB with
+// the title and envelope. 4 KB turned away long CJK or Thai reports.
+export const FEEDBACK_BODY_LIMIT = 16384;
 export const FEEDBACK_CATEGORIES = ["bug", "idea", "other"];
 export const TITLE_MIN = 3;
 export const TITLE_MAX = 120;
 export const BODY_MAX = 2000;
 const REQUIRED_FIELDS = ["title", "category"];
-// `website` is a honeypot: the form hides it, so only a bot fills it in.
-const OPTIONAL_FIELDS = ["body", "website"];
+// `website` is a honeypot the landing keeps out of layout, where neither a
+// person nor browser autofill can reach it; `id` is the draft's UUID v4.
+const OPTIONAL_FIELDS = ["body", "website", "id"];
 const CONTROL = /[\x00-\x1f\x7f]/g;
 const CONTROL_EXCEPT_NEWLINE = /[\x00-\x09\x0b-\x1f\x7f]/g;
 
@@ -34,7 +38,8 @@ export function parseFeedback(value) {
     ) ||
     !REQUIRED_FIELDS.every((key) => Object.hasOwn(value, key)) ||
     !Object.values(value).every((field) => typeof field === "string") ||
-    !FEEDBACK_CATEGORIES.includes(value.category)
+    !FEEDBACK_CATEGORIES.includes(value.category) ||
+    (value.id !== undefined && !UUID_V4.test(value.id))
   ) {
     return undefined;
   }
@@ -43,7 +48,13 @@ export function parseFeedback(value) {
   if (title.length < TITLE_MIN || title.length > TITLE_MAX || body.length > BODY_MAX) {
     return undefined;
   }
-  return { title, body, category: value.category, spam: (value.website ?? "").trim() !== "" };
+  return {
+    title,
+    body,
+    category: value.category,
+    id: value.id ?? null,
+    spam: (value.website ?? "").trim() !== "",
+  };
 }
 
 export async function readFeedback(request) {

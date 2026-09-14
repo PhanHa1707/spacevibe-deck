@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { build } from "esbuild";
+import { FEEDBACK_PROBE_CRON } from "./linear-feedback.mjs";
 import { AGENT_KEYS, SURFACE_KEYS, UPDATE_KEYS, COUNTER_CAP, validPayload } from "./payload.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -78,7 +79,8 @@ test("deployment disables logs, traces, public preview URLs and exposes only the
   // The 35-day retention ceiling is only held by the sweep running DAILY; a
   // drifted schedule would keep raw rows past it and nothing else would notice,
   // because logs and traces are off by design.
-  assert.deepEqual(config.triggers.crons, ["0 3 * * *"]);
+  // The second cron is the hourly feedback probe; the Worker dispatches on it.
+  assert.deepEqual(config.triggers.crons, ["0 3 * * *", FEEDBACK_PROBE_CRON]);
 });
 
 test("privacy routes publish the dated notice and include its source in the deployment", async () => {

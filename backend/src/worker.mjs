@@ -1,4 +1,5 @@
 import { FEEDBACK_PATH, handleFeedback } from "./feedback-routes.mjs";
+import { FEEDBACK_PROBE_CRON, probeFeedbackConfig } from "./linear-feedback.mjs";
 import { PayloadError, readPayload } from "./payload.mjs";
 import { createUsageRepository } from "./usage-repository.mjs";
 
@@ -38,6 +39,12 @@ export default {
     }
   },
   async scheduled(controller, env) {
+    // The feedback probe has its own cron: its failure means "feedback is
+    // broken", never "retention is overdue".
+    if (controller.cron === FEEDBACK_PROBE_CRON) {
+      await probeFeedbackConfig(env);
+      return;
+    }
     // Reject on failure so the platform records a failed cron invocation.
     // The transaction leaves raw rows intact if aggregation cannot complete.
     await createUsageRepository(env.DB).expire(controller.scheduledTime);
