@@ -24,6 +24,7 @@ import { listPromptAssets } from "../prompt-assets";
 import { readImageAsDataUrl, scanWorkspaceFavicon } from "../images";
 import { createUsageService } from "../usage/service";
 import { USAGE_CACHE_FILE } from "../usage/model";
+import { createAgentLimitsService } from "../agent-limits/service";
 
 export interface RegisterServicesDeps {
   readonly labelOf: (event: IpcMainInvokeEvent) => string;
@@ -31,6 +32,13 @@ export interface RegisterServicesDeps {
 }
 
 export function registerServices(deps: RegisterServicesDeps): void {
+  const limits = createAgentLimitsService({
+    userData: app.getPath("userData"),
+    executable: process.execPath,
+  });
+  ipcMain.handle(CHANNELS.agentLimitsSnapshot, () => limits.snapshot());
+  app.once("will-quit", () => limits.close());
+  process.once("exit", () => limits.close());
   ipcMain.handle(CHANNELS.gitBranch, (_event, { cwd }) => gitBranch(cwd));
   // Never rejects: every failure arrives as a `plain` scan, so the rail degrades
   // to the flat folder list Deck already shows rather than raising an error.

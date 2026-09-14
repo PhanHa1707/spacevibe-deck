@@ -7,6 +7,14 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 
 ## Unreleased
 
+### Sidebar
+
+- **Agent usage replaces Unread.** The [compact sidebar summary](src/ui/usage/agent-usage-summary.tsx)
+  shows agent logos and remaining allowance, with reset times on hover.
+  Electron reads Codex limits through its CLI and Claude Code limits through a
+  status-line collector that preserves your existing status line on macOS/Linux.
+  Missing or expired readings show a dash.
+
 ### Updates
 
 - **Update failures are easier to recover from.** Two consecutive failed checks

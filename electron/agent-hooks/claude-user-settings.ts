@@ -119,8 +119,18 @@ export async function syncClaudeUserSettings(
   scriptPath: string,
   enabled: boolean,
 ): Promise<void> {
+  if (!enabled && (await readOptional(await resolveSettings(file))) === null) return;
+  await updateClaudeUserSettings(file, (document) =>
+    reconcileClaudeHooks(document, scriptPath, enabled),
+  );
+}
+
+/** Serialize a scoped settings merge with Deck's hook installer, preserving symlinks and modes. */
+export async function updateClaudeUserSettings(
+  file: string,
+  update: (document: Document) => Document | Promise<Document>,
+): Promise<void> {
   const target = await resolveSettings(file);
-  if (!enabled && (await readOptional(target)) === null) return;
   await fs.mkdir(path.dirname(target), { recursive: true });
   // Cooperating Deck processes serialize merges; never steal a stale/unknown lock.
   const lockPath = `${target}.deck-hooks.lock`;
@@ -128,7 +138,8 @@ export async function syncClaudeUserSettings(
   try {
     const before = await readOptional(target);
     const document: unknown = before === null ? {} : JSON.parse(before);
-    const next = reconcileClaudeHooks(document, scriptPath, enabled);
+    if (!record(document)) throw new Error("Claude settings must be an object.");
+    const next = await update(document);
     if (JSON.stringify(document) === JSON.stringify(next)) return;
     const mode = before === null ? 0o600 : (await fs.stat(target)).mode & 0o777;
     if ((await readOptional(target)) !== before || (await resolveSettings(file)) !== target) {

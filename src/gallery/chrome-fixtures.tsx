@@ -12,7 +12,8 @@ import { WorktreeAgentStack } from "../ui/worktree-agent-stack";
 import { TabStrip } from "../ui/tab-strip";
 import { SIDEBAR_TOOLS_HIDDEN, SidebarActions } from "../ui/sidebar-actions";
 import { SidebarFrameActions } from "../ui/sidebar-toggle";
-import { RecentSessionActivity } from "../ui/sessions/recent-session-activity";
+import { AgentUsageSummary } from "../ui/usage/agent-usage-summary";
+import type { AgentLimitsSnapshot } from "../lib/agent-limits";
 import type { CardActions } from "../ui/worktree-card-menus";
 
 /**
@@ -31,6 +32,29 @@ import type { CardActions } from "../ui/worktree-card-menus";
  */
 
 export const NOOP = (): void => {};
+
+/** Illustrative allowance only; the gallery never reads an account or installs a collector. */
+export function agentLimitsFixture(now = Date.now()): AgentLimitsSnapshot {
+  return [
+    {
+      agent: "claude",
+      state: "ready",
+      observedAtMs: now,
+      windows: [
+        { durationMinutes: 300, usedPercent: 32, resetsAtMs: now + 2 * 60 * 60_000 },
+        { durationMinutes: 10080, usedPercent: 58, resetsAtMs: now + 3 * 24 * 60 * 60_000 },
+      ],
+    },
+    {
+      agent: "codex",
+      state: "ready",
+      observedAtMs: now,
+      windows: [
+        { durationMinutes: 10080, usedPercent: 82, resetsAtMs: now + 4 * 24 * 60 * 60_000 },
+      ],
+    },
+  ];
+}
 
 /** The shipping leading frame cluster, with drag disabled in the gallery. */
 export function sidebarFrameActionsSpecimen(onToggle = NOOP) {
@@ -154,14 +178,7 @@ export function agentRailNavigationSpecimen({
       legacy={{ onOpenWorkspace: NOOP, onResumeWorktree: NOOP }}
       cardActions={GALLERY_CARD_ACTIONS}
       fileController={fileControllerFixture}
-      recentActivity={
-        <RecentSessionActivity
-          filter="unread"
-          onResume={NOOP}
-          onViewAll={NOOP}
-          onFocusPane={onFocusPane}
-        />
-      }
+      usageSummary={<AgentUsageSummary snapshot={agentLimitsFixture()} onOpenUsage={NOOP} />}
       footer={
         showFooter ? (
           <SidebarActions

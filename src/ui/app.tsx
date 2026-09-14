@@ -31,7 +31,7 @@ import {
 import type { BootMode } from "../terminal/transfer-client";
 import { applyThemeVars } from "../lib/theme-vars";
 import { BUILT_IN_PRESET, type Preset } from "../lib/preset-schema";
-import { resolveInheritedCwds, type PaneLaunchReceipt } from "../terminal/tab-materialize";
+import { resolveInheritedCwds } from "../terminal/tab-materialize";
 import type { DockTab } from "../settings/settings-schema";
 import { agentOptions, agentProcessMatchers, probeNames } from "../lib/agent-catalog";
 import { resolveTheme } from "../settings/themes";
@@ -96,12 +96,7 @@ import {
 import type { SessionEntry } from "../lib/session-history";
 import { resumeSession } from "../sessions/resume-session";
 import { installRecentActivitySync } from "../sessions/recent-activity-sync";
-import {
-  deadProjects,
-  recentDeadProjects,
-  refreshSessions,
-  sessionsSupported,
-} from "../sessions/sessions-store";
+import { deadProjects, refreshSessions, sessionsSupported } from "../sessions/sessions-store";
 import { PresetEditor } from "../presets/preset-editor";
 import { SavePresetDialog, type SaveTarget } from "../presets/save-preset-dialog";
 import type { PresetArtifact } from "../presets/mock-model";
@@ -190,7 +185,7 @@ import { ExplorerTab } from "../files/ui/explorer-tab";
 import { CreateEntryDialog } from "../files/ui/create-entry-dialog";
 import { available as fileCreateAvailable } from "../host/file-create-host";
 import { SessionsDockTab } from "./sessions/sessions-dock-tab";
-import { RecentSessionActivity } from "./sessions/recent-session-activity";
+import { RailAgentLimits } from "./usage/agent-usage-summary";
 import { DockPanel } from "./dock/dock-panel";
 import { SIDEBAR_TOOLS_HIDDEN, SidebarActions } from "./sidebar-actions";
 import { DockToggle } from "./dock/dock-toggle";
@@ -487,21 +482,6 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
       reportPersistError("Couldn't resume that session.");
     }
     return resumed;
-  };
-
-  const resumeRecentSessionEntry = async (
-    entry: SessionEntry,
-  ): Promise<PaneLaunchReceipt | false> => {
-    const manager = tabsRef.current;
-    let receipt: PaneLaunchReceipt | null = null;
-    const resumed = await resumeSessionEntry(entry, recentDeadProjects.value, async (intent) => {
-      receipt = (await manager?.materializePane(intent)) ?? null;
-      return receipt !== null;
-    });
-    if (boardClosesAfterResume(resumed)) {
-      boardOpen.value = false;
-    }
-    return resumed ? (receipt ?? false) : false;
   };
 
   /** Restore the newest archived tab set belonging to one legacy rail row. */
@@ -2072,13 +2052,10 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
             // Hidden on the owner's ask (2026-08-17); `More` carries these rows
             // in both layouts while the flag is on. See `SIDEBAR_TOOLS_HIDDEN`.
             footer={SIDEBAR_TOOLS_HIDDEN ? undefined : railActions}
-            recentActivity={
-              <RecentSessionActivity
-                filter="unread"
-                onResume={resumeRecentSessionEntry}
-                onFocusPane={focusRailPane}
-                onViewAll={() => openDockTab("sessions")}
-              />
+            usageSummary={
+              effectiveSidebarCollapsed() ? null : (
+                <RailAgentLimits onOpenUsage={() => openDockTab("usage")} />
+              )
             }
             onSelectTab={selectTab}
             legacy={{

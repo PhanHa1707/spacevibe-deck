@@ -358,22 +358,11 @@ describe("recent agent activity wiring", () => {
     expect(source).not.toContain("void probeSessionsSupport();");
   });
 
-  it("mounts the activity only in AgentRail with resume and View all callbacks", () => {
+  it("mounts agent usage in the rail and keeps session resume in the Sessions dock", () => {
     const railMount = source.slice(source.indexOf("<AgentRail"), source.indexOf("topTabs={"));
-
-    expect(source.match(/<RecentSessionActivity\b/g)).toHaveLength(1);
-    expect(railMount).toContain("<RecentSessionActivity");
-    expect(railMount).toContain('filter="unread"');
-    expect(railMount).toContain("onResume={resumeRecentSessionEntry}");
-    expect(railMount).toContain('onViewAll={() => openDockTab("sessions")}');
-  });
-
-  it("keeps recent activity and the full Sessions view on their matching liveness snapshots", () => {
-    expect(source).toContain("unavailableProjects: ReadonlySet<string> = deadProjects.value");
-    expect(source).toContain("isDead: (cwd) => unavailableProjects.has(cwd)");
-    expect(source).toContain("resumeSessionEntry(entry, recentDeadProjects.value,");
-    expect(source).toContain("onFocusPane={focusRailPane}");
-    expect(source).toContain("onResume={resumeRecentSessionEntry}");
+    expect(railMount).toContain("<RailAgentLimits");
+    expect(railMount).toContain('onOpenUsage={() => openDockTab("usage")}');
+    expect(source).not.toContain("<RecentSessionActivity");
     expect(source).toContain(
       "<SessionsDockTab onResume={(entry) => void resumeSessionEntry(entry)} />",
     );

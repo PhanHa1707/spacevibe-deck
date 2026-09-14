@@ -3242,32 +3242,34 @@ Numbered 32 because §22 stays reserved and §31 was the previous highest rule.
   shown inert.** This applies DL-19.7 to host-only workspace actions and to the
   runtime selector: capability absence is not presented as a disabled feature.
 
-## 33. Recent agent activity
+## 33. Sidebar usage and retained activity rows
 
-Added 2026-08-25 from the owner-approved
-recent agent activity design
-`decided`. The production block is
-[RecentSessionActivity](../src/ui/sessions/recent-session-activity.tsx)
-`current`, composed through [AgentRail](../src/ui/agent-rail.tsx) `current`;
-its five-item, exact-tail snapshot is owned by
-[sessions-store.ts](../src/sessions/sessions-store.ts) `current` and its
-treatment by [13-sessions.css](../src/styles/13-sessions.css) `current`.
-Numbered 33 because §22 stays reserved and §32 was the previous highest rule.
+The sidebar uses [AgentUsageSummary](../src/ui/usage/agent-usage-summary.tsx),
+composed through [AgentRail](../src/ui/agent-rail.tsx), with treatment in
+[15-rail-footer.css](../src/styles/15-rail-footer.css). The retained
+[RecentSessionActivity](../src/ui/sessions/recent-session-activity.tsx) component
+still follows DL-33.2–33.5 below when reused; it is no longer the sidebar footer.
 
-- **DL-33.1** **Recent activity is a separate block, not a fourth rail tier.**
-  It is pinned below the live and remembered project
-  [scrollport](../src/ui/agent-rail.tsx), above the footer, with one
-  `--seam-recessed` separator and no card or independent background. Only the
-  project list scrolls; the activity block retains its height. It aggregates
-  **at most five** supported sessions across every
-  project, globally newest first. The sidebar applies an **Unread** filter
-  to that snapshot (owner, 2026-09-09), using the existing `asked` signal:
-  questions, warnings and completed results not yet acknowledged. The heading
-  reads `Unread`; a successful empty result reads `No unread recent sessions.`
-  Working, checked and unpaired sessions do not appear. Focus acknowledges the
-  pane, so the row leaves the filter as soon as its unread state clears.
-  `View all` still opens the complete history. This is a compact re-entry
-  surface; it does not change DL-27's project → worktree → agent hierarchy.
+- **DL-33.1** **Agent usage fits its content below the project list.**
+  Owner-approved replacement direction, 2026-09-14. The
+  [summary](../src/ui/usage/agent-usage-summary.tsx) uses
+  [content-driven height](../src/styles/15-rail-footer.css) with explicit
+  border-box sizing and no flex grow or shrink. Agents share one horizontal
+  row, each in a compact badge with a quiet tonal background, 6px between
+  badges and between each logo and its limit (owner refinement, 2026-09-14).
+  Badges use a 28px minimum height and scroll horizontally if the sidebar is
+  too narrow. Loading, error and missing-data states retain the badges and
+  their height. One `--seam-recessed` separator, no independent card background.
+  Each badge displays only the agent logo and limit value, without a visible
+  header, agent name, cost, reset copy
+  or footnote (owner refinement, 2026-09-14). Agent names and unavailable-state
+  explanations stay in tooltips and accessible labels. Values show remaining
+  allowance, with the source window label (`5h`, `7d`, or the returned duration).
+  Reset times stay in the tooltip. The [limit normalizer](../src/lib/agent-limits.ts)
+  expires missing, failed, stale or reset windows to a dash; percentages are
+  never inferred from token counts. Selecting a badge opens
+  the Usage dock. A collapsed sidebar hides the summary. This does not change
+  DL-27's project → worktree → agent hierarchy.
 - **DL-33.2** **Every row is a verified session summary.** The store pins each
   tail request to the listed session id and accepts a sentence only when the
   returned id matches exactly; otherwise the summary falls back to title, then

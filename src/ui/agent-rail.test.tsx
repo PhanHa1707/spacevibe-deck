@@ -1406,7 +1406,7 @@ describe("AgentRail carried-over jobs", () => {
 
   it("places optional recent activity outside the project scrollport and before the footer", async () => {
     mount({
-      recentActivity: <section data-testid="recent-activity" />,
+      usageSummary: <section data-testid="recent-activity" />,
       footer: <div data-testid="rail-footer" />,
     });
     await settle();

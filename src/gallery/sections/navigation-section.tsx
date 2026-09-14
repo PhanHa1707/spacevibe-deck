@@ -1,7 +1,6 @@
-import { useEffect, useRef } from "preact/hooks";
-import { tabViews } from "../../terminal/tabs-store";
 import { useSignal } from "@preact/signals";
-import { RecentSessionActivity } from "../../ui/sessions/recent-session-activity";
+import { AgentUsageSummary } from "../../ui/usage/agent-usage-summary";
+import { agentLimitsFixture } from "../chrome-fixtures";
 import { agentStatusRailChromeSpecimen, agentStatusRailSpecimen } from "../agent-status-rail";
 import {
   agentRailVariantsSpecimen,
@@ -104,16 +103,16 @@ export function NavigationSection() {
         {railStructureSpecimen()}
       </Specimen>
       <Specimen
-        name="Recent activity · normal sidebar"
-        note="current proposal awaiting owner eye review · five global sessions rendered by the production RecentSessionActivity inside the shipping AgentRail and window shell"
+        name="Agent usage · normal sidebar"
+        note="Compact agent badges with illustrative remaining allowance. The gallery never reads your account."
         surface="none"
         tall
       >
         {agentStatusRailChromeSpecimen()}
       </Specimen>
       <Specimen
-        name="Recent activity · compact sidebar"
-        note="current proposal awaiting owner eye review · the same production shell at the persisted sidebar floor; summary copy yields before the glyph and relative time"
+        name="Agent usage · compact sidebar"
+        note="The same badge row at the persisted sidebar floor."
         surface="none"
         tall
       >
@@ -127,52 +126,19 @@ export function NavigationSection() {
 
 const NORMAL_SIDEBAR_WIDTH = 275;
 
-/** Real production rows, with simulated host outcomes and no CLI launch. */
-function RecentActivityDemo({ width }: { readonly width: number }) {
-  const originalTabs = useRef(tabViews.peek());
-  useEffect(
-    () => () => {
-      tabViews.value = originalTabs.current;
-    },
-    [],
-  );
-  const result = useSignal("Only unread recent sessions are shown. Select one to mark it read.");
+/** The same compact limit badges used in the app. */
+function AgentUsageDemo({ width }: { readonly width: number }) {
+  const result = useSignal("Illustrative remaining allowance. Hover a logo for reset details.");
   return (
     <div style={{ width, maxWidth: "100%" }}>
-      <div style={{ background: "var(--sidebar-bg)", padding: "8px 0" }}>
-        <RecentSessionActivity
-          filter="unread"
-          onResume={() => {
-            result.value = "The pane closed; Deck would resume this session.";
-          }}
-          onFocusPane={(index, paneId) => {
-            tabViews.value = tabViews.value.map((tab, tabIndex) =>
-              tabIndex === index
-                ? {
-                    ...tab,
-                    panes: tab.panes?.map((pane) =>
-                      pane.paneId === paneId ? { ...pane, attention: "none" as const } : pane,
-                    ),
-                  }
-                : tab,
-            );
-            result.value = "Opened and marked read. The session leaves this filter.";
-          }}
-          onViewAll={() => {
-            result.value = "Opens the complete Sessions view in Deck.";
+      <div style={{ background: "var(--sidebar-bg)", padding: "8px" }}>
+        <AgentUsageSummary
+          snapshot={agentLimitsFixture()}
+          onOpenUsage={() => {
+            result.value = "In Deck, this opens the Usage tab with detailed statistics.";
           }}
         />
       </div>
-      <button
-        type="button"
-        style={{ marginTop: "16px" }}
-        onClick={() => {
-          tabViews.value = originalTabs.current;
-          result.value = "Unread preview restored.";
-        }}
-      >
-        Reset unread preview
-      </button>
       <p role="status" style={{ color: "var(--text-muted)", minHeight: "3em" }}>
         {result}
       </p>
@@ -180,26 +146,26 @@ function RecentActivityDemo({ width }: { readonly width: number }) {
   );
 }
 
-export function RecentActivitySection() {
+export function AgentUsageSection() {
   return (
     <>
       <SectionHead
-        title="Recent activity"
-        blurb="Recent activity filtered to unread only: questions, warnings and results not yet seen. Opening a session acknowledges it and removes it from the list. View all still opens the complete history."
+        title="Agent usage"
+        blurb="Sidebar preview · one compact badge per agent. Only logos and remaining allowance; figures are illustrative. Hover for reset details."
       />
       <Specimen
         name="Normal sidebar · 275px"
-        note="Select the unread row to open it and see the empty state. Reset restores the seeded unread state."
+        note="The production component. Select a badge to open usage details."
         surface="none"
       >
-        <RecentActivityDemo width={NORMAL_SIDEBAR_WIDTH} />
+        <AgentUsageDemo width={NORMAL_SIDEBAR_WIDTH} />
       </Specimen>
       <Specimen
         name="Compact sidebar · 200px"
-        note="The same production component at the sidebar floor. Use the Gallery theme picker to compare Light and Dark."
+        note="The badges share one row and scroll horizontally when needed. Use the theme picker to compare Light and Dark."
         surface="none"
       >
-        <RecentActivityDemo width={SIDEBAR_WIDTH_MIN} />
+        <AgentUsageDemo width={SIDEBAR_WIDTH_MIN} />
       </Specimen>
     </>
   );

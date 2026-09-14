@@ -10,6 +10,7 @@
 
 /** Commands: renderer → main, request/response. */
 export const CHANNELS = {
+  agentLimitsSnapshot: "agent_limits_snapshot",
   spawnShell: "spawn_shell",
   writePty: "write_pty",
   resizePty: "resize_pty",

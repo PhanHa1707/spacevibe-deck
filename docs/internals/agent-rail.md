@@ -54,16 +54,47 @@ The words (`failed`, `needs you`, `working`, `done`, `idle`) live only in the ro
 accessible name. Where attention and phase come from is in
 [terminal.md](terminal.md#agent-phase-and-attention).
 
-## Recent session re-entry
+## Agent usage and session re-entry
 
-[Recent activity](../../src/ui/sessions/recent-session-activity.tsx) applies its
-`unread` filter to the store's latest-five snapshot before rendering. Unread is
-`paneSignal(...).state === "asked"`, the rail's existing yellow mark, not the
-legacy tab-level unread-output bit. It is window-scoped and does not imply that
-older unread sessions outside the snapshot have been scanned. The raw snapshot
-still determines cold loading; an empty filter during a refresh is not a new
-cold load. The component's `all` mode remains available for its reusable row
-surface, while production and Gallery explicitly select `unread`.
+The [sidebar summary](../../src/ui/usage/agent-usage-summary.tsx) replaces Unread
+below the project scrollport. Its [single badge row](../../src/styles/15-rail-footer.css)
+fits its content and separator padding, with horizontal overflow in narrow sidebars.
+Each agent badge shows only the logo and adjacent limit value; the name and unavailable
+state are available through its tooltip and accessible label. A dash means missing,
+expired or failed data, never zero quota. Selecting a badge opens the existing
+[Usage dock](../../src/ui/usage/usage-dock-tab.tsx).
+
+[Electron's limit service](../../electron/agent-limits/service.ts) reads Codex's
+`account/rateLimits/read` using the installed CLI and its default login profile,
+without starting a model turn. It shares one request per minute across windows.
+The [normalizer](../../src/lib/agent-limits.ts) selects the `codex` bucket and
+uses the returned window duration: `primary` is not necessarily five hours.
+
+For Claude Code on macOS/Linux, the service installs a
+[status-line collector](../../electron/agent-limits/claude-reader.ts) in the
+configured Claude user settings, preserving the existing command and its options.
+The original configuration stays in the private `agent-limits/statusline-owner.json`
+under Electron userData; `restoreClaudeLimitCollector` restores only a still-owned
+command and leaves newer user edits alone. If Deck's executable or script disappears,
+the installed shell command falls back to the original status line. The
+[collector](../../electron/agent-limits/claude-statusline.ts) forwards the original
+stdin/output and records only five-hour/seven-day quota fields in bounded local
+captures. It does not store prompts or authentication tokens.
+
+Claude's source is a session-reported observation, not an on-demand account API.
+Each status-line receipt renews its capture timestamp, even when the percentage
+is unchanged. The newest capture with limit data wins across sessions; a session
+without limits cannot hide another session's reading. No window is inferred when
+the CLI omits it. Both providers expire at reset or after five minutes without a
+new observation (a status-line receipt for Claude). The
+[sidebar](../../src/ui/usage/agent-usage-summary.tsx) expires values even without an
+IPC reply. Multiple login profiles are not aggregated. Tauri has no collector;
+Claude collection on Windows and Codex `.cmd` shims currently return unavailable.
+
+[Recent activity](../../src/ui/sessions/recent-session-activity.tsx) remains a
+reusable component with its exact-session re-entry contract, but is no longer
+mounted in the sidebar. The [Sessions dock](../../src/ui/sessions/sessions-dock-tab.tsx)
+retains the full history and Resume action.
 
 On click it rechecks
 [the exact agent/session pairing](../../src/ui/sessions/live-session-state.ts)

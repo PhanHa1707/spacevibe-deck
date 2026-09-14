@@ -120,12 +120,10 @@ export interface AgentRailProps {
    */
   footer?: ComponentChildren;
   /**
-   * Optional prose block placed after the project stream inside the rail's
-   * one vertical scrollport. `App` supplies Recent Activity here; keeping the
-   * slot generic leaves session loading, navigation and resume behavior with
-   * the Sessions feature rather than making the rail own them.
+   * Content-sized usage summary below the project scrollport. The Usage feature
+   * owns its data and navigation; the rail only places the supplied surface.
    */
-  recentActivity?: ComponentChildren;
+  usageSummary?: ComponentChildren;
   /**
    * The same `SurfaceStrip` wired into `TabManager`. Unread by this file's
    * own render since the worktree card landed (2026-08-26): DL-27.22's
@@ -417,7 +415,7 @@ function WorktreeCardRail(props: AgentRailProps) {
         </section>
       </div>
 
-      {props.recentActivity}
+      {props.usageSummary}
       {props.footer}
     </nav>
   );
