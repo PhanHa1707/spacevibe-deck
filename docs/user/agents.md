@@ -22,7 +22,9 @@ exists to run agents that keep working, and it is also why every command is spel
 why each one can be disabled. OpenCode ships bare because its `--auto` mode is opt-in per
 session.
 
-This order is also the digit-key order in the quick picker.
+Until you choose [quick agents](#quick-agents), the checkout menu offers the first five
+installed agents: these in this order, then your custom agents
+([quick agent defaults](../../src/settings/quick-agents.ts)).
 
 ## Settings → Agents
 
@@ -56,9 +58,9 @@ Each agent is one row showing its name and the command it launches with:
 - For an agent under **Available to install**, choose **Configure launch** to prepare its
   command before installation. Model controls appear after Deck detects the CLI
   ([agent settings](../../src/ui/settings/launch-profile-editor.tsx)).
-- **Add command.** Save another command line for an agent, to pick in the quick picker. The
-  first one saved for an agent also becomes its command. The agent is derived from the
-  command's first word.
+- **Add command.** Save another command line for an agent. The first one saved for an agent
+  also becomes its command; later ones stand behind it for the reset arrow above. The agent
+  is derived from the command's first word.
 
 A command is typed verbatim into a live interactive shell, so it may use only letters, digits,
 spaces and `. , : @ + = _ - /`. Pipes, `&&`, `;`, quotes, redirects, variables and newlines
@@ -95,11 +97,15 @@ logs only for the built-ins it knows.
 | OpenCode    | yes                      | exact session id                           |
 | Gemini CLI  | no                       | `--resume latest`                          |
 | Antigravity | no                       | best-effort session id, else `--continue`  |
-| Cursor      | no                       | relaunches the command bare                |
 | Custom      | no                       | relaunches the declared command unchanged  |
 
-Working, asked and failed states come from the terminal itself (bell, notification and
-progress sequences the tool emits, plus sustained output) and work for any agent.
+By default, working, needs-you and failed states come from the terminal itself (bell,
+notification and progress sequences the tool emits, plus sustained output) and work for any
+agent. When Deck reads a needs-you or done state from output timing rather than from the
+agent, the row's tooltip says **(inferred)**. With **Signals** on for Claude Code, Codex or
+OpenCode, the state is the agent's own report for new sessions, and a needs-you state can say
+what it waits on, such as a permission prompt. An agent whose process has left its pane reads
+as **ended** ([rail states](../../src/ui/worktree-card-row.tsx)).
 
 ## Token usage
 

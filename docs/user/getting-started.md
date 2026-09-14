@@ -48,10 +48,12 @@ file edits and window placement are not restored.
 ## Launch an agent
 
 Press **⌘T** (Windows: **Ctrl+Shift+T**) for the active checkout, or use `+` / **New agent**
-on a checkout card in the Agent Rail. The menu lists the agents Deck found on your `PATH`;
-choose one to launch it in that checkout using the command shown in
-[Settings → Agents](agents.md). **Open another project…** lets you choose another workspace.
-Use **New split here** for a plain shell.
+on a checkout card in the Agent Rail. The menu lists your
+[quick agents](agents.md#quick-agents), up to five; choose one to launch it in that checkout
+using the command shown in [Settings → Agents](agents.md#settings--agents). **Open shell**
+opens a plain shell in a new tab, and **New split here** opens one beside the current tab.
+The ⌘T menu also offers **Open another project…** to choose another workspace
+([checkout actions](../../src/ui/worktree-card-menus.tsx)).
 
 ## The window
 
