@@ -1,3 +1,9 @@
+// First, before any other module loads: an import-time throw in one of them
+// is exactly the crash this exists to report, and the renderer's protocol
+// must be registered before `ready`.
+import { initCrashReporting } from "./crash-reporting/init";
+initCrashReporting();
+
 import { createCodexIntegration } from "./agent-hooks/codex-integration";
 /**
  * Electron main process — the host.
