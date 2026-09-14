@@ -15,6 +15,7 @@ import { ToolbarSection } from "./sections/toolbar-section";
 import { TokensSection } from "./sections/tokens-section";
 import { LaunchProfilesSection } from "./sections/launch-profiles-section";
 import { SignalMarkVariantsSection } from "./sections/signal-mark-variants";
+import { UsageDirectionsSection } from "./sections/usage-directions";
 
 export interface GallerySection {
   readonly id: string;
@@ -60,6 +61,7 @@ export const GALLERY_SECTIONS: readonly GallerySection[] = [
   { id: "matrix", label: "native detail matrix", Section: MatrixSection },
   { id: "navigation", label: "navigation", Section: NavigationSection },
   { id: "agent-usage", label: "agent usage", Section: AgentUsageSection },
+  { id: "usage-directions", label: "usage directions", Section: UsageDirectionsSection },
   {
     id: "attention",
     label: "attention direction",
