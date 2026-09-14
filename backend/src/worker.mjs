@@ -1,3 +1,4 @@
+import { FEEDBACK_PATH, handleFeedback } from "./feedback-routes.mjs";
 import { PayloadError, readPayload } from "./payload.mjs";
 import { createUsageRepository } from "./usage-repository.mjs";
 
@@ -10,6 +11,7 @@ const HEADERS = { "cache-control": "no-store", "x-content-type-options": "nosnif
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === FEEDBACK_PATH) return handleFeedback(request, env);
     if (url.pathname !== "/v1/ping") return new Response(null, { status: 404, headers: HEADERS });
     if (request.method !== "POST")
       return new Response(null, { status: 405, headers: { ...HEADERS, allow: "POST" } });

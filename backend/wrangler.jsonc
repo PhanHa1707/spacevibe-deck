@@ -18,8 +18,18 @@
       "name": "INGEST_LIMITER",
       "namespace_id": "34201",
       "simple": { "limit": 1000, "period": 60 }
+    },
+    {
+      "name": "FEEDBACK_LIMITER",
+      "namespace_id": "34202",
+      "simple": { "limit": 20, "period": 60 }
     }
   ],
+  "vars": {
+    "FEEDBACK_TEAM_ID": "cb65f88e-7252-4bcf-b4c7-30030b26ecea",
+    "FEEDBACK_LABEL_ID": "d67dc808-53f9-4fde-9483-2cffe14c0169",
+    "FEEDBACK_BACKLOG_STATE_ID": "cd3a4095-d1d6-48a3-8d10-82231ff5f521"
+  },
   "d1_databases": [
     {
       "binding": "DB",

@@ -96,8 +96,11 @@ export class PayloadError extends Error {
   }
 }
 
-/** Stream the body so an omitted or false Content-Length cannot bypass the cap. */
-export async function readPayload(request) {
+/**
+ * Stream the body so an omitted or false Content-Length cannot bypass the cap.
+ * Shared by every JSON route; each caller validates the parsed value itself.
+ */
+export async function readJsonBody(request, limit = BODY_LIMIT) {
   if (
     request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json"
   ) {
@@ -110,7 +113,7 @@ export async function readPayload(request) {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      if (bytes.byteLength + value.byteLength > BODY_LIMIT) {
+      if (bytes.byteLength + value.byteLength > limit) {
         // Cancellation is advisory; its failure must not turn a 413 into a retry.
         void reader.cancel().catch(() => undefined);
         throw new PayloadError(413);
@@ -120,12 +123,15 @@ export async function readPayload(request) {
   } finally {
     reader.releaseLock();
   }
-  let payload;
   try {
-    payload = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   } catch {
     throw new PayloadError(400);
   }
+}
+
+export async function readPayload(request) {
+  const payload = await readJsonBody(request);
   if (!validPayload(payload)) throw new PayloadError(400);
   return payload;
 }

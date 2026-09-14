@@ -104,7 +104,7 @@ test("malformed JSON is terminal; missing infrastructure remains retryable", asy
   assert.equal((await worker.fetch(request(), {})).status, 503);
 });
 
-test("there is no public read API", async () => {
+test("usage data has no read route: unknown paths 404 and ping is POST-only", async () => {
   assert.equal(
     (await worker.fetch(new Request("https://api.deck.spacevibe.dev/v1/stats"), {})).status,
     404,
