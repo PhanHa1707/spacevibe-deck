@@ -6,10 +6,15 @@ name: Electron Release
 #
 # The tag shape is NOT free. `GitHubProvider.getLatestVersion` skips every
 # release whose tag fails `semver.valid`, and derives the update channel from
-# `semver.prerelease(tag)[0]`. Two shapes are accepted: `vX.Y.Z` (stable, the
-# default `latest` channel) and `vX.Y.Z-electron.N` (prerelease, the existing
-# `electron` channel). A tag like `electron-v1.0.0` would be invisible to the
-# updater while every other signal looked healthy.
+# `semver.prerelease(tag)[0]`. A tag like `electron-v1.0.0` would be invisible
+# to the updater while every other signal looked healthy.
+#
+# Only `vX.Y.Z` (stable, the default `latest` channel) is accepted for now.
+# Every build through 1.2.0 checks with `allowPrerelease` on and installs the
+# feed's newest entry, so a promoted `vX.Y.Z-electron.N` would move every
+# stable install onto the `electron` channel for good (DECK-103). The
+# prerelease handling further down stays for when the installed base runs a
+# build that resolves `releases/latest`.
 #
 # The published manifests are `latest-mac.yml` / `latest.yml`, not
 # `electron-mac.yml`: app-builder-lib only copies the channel into
@@ -29,10 +34,11 @@ name: Electron Release
 # 2026-08-19 against v0.12.5-electron.2.
 #
 # `build/v…` is not valid semver, so a prerelease build's `GitHubProvider`
-# skips that feed entry (GitHubProvider.js:71), and a stable build never reads
-# the feed's tag list at all — it resolves `releases/latest`
-# (electron/updater/updater.ts). Either way a running app sees nothing until
-# the release is real. The release tag is created by GitHub itself when the draft is promoted,
+# skips that feed entry (GitHubProvider.js:71), and a stable build after 1.2.0
+# never reads the feed's tag list at all — it resolves `releases/latest`
+# (electron/updater/updater.ts). Builds through 1.2.0 still read it and take
+# its first entry, so while this run is in flight they ask the trigger tag for
+# manifests and get 404 (DECK-103); keep that window short. The release tag is created by GitHub itself when the draft is promoted,
 # which happens only after every artifact is uploaded AND verified — a draft
 # holds a `tag_name` without creating the git ref, measured with a probe
 # release that produced an `untagged-…` URL and no remote tag.
@@ -49,7 +55,6 @@ on:
   push:
     tags:
       - "build/v[0-9]+.[0-9]+.[0-9]+"
-      - "build/v[0-9]+.[0-9]+.[0-9]+-electron.[0-9]+"
 
 permissions:
   contents: read
@@ -120,10 +125,10 @@ jobs:
           fi
           if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "channel=stable" >> "$GITHUB_OUTPUT"
-          elif [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-electron\.[0-9]+$ ]]; then
-            echo "channel=prerelease" >> "$GITHUB_OUTPUT"
           else
-            echo "Version $version must be X.Y.Z (stable) or X.Y.Z-electron.N (prerelease)"
+            # Paused, not retired (DECK-103): builds through 1.2.0 would take a
+            # promoted prerelease from the stable feed and never return.
+            echo "Version $version must be X.Y.Z. Prerelease tags are paused: builds through 1.2.0 would install them from the stable feed (DECK-103)."
             exit 1
           fi
 

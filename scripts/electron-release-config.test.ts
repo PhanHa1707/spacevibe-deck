@@ -205,7 +205,7 @@ describe("the release packaging script", () => {
 });
 
 describe("the Electron release workflow", () => {
-  it("builds from a tag no running app can see, stable and prerelease alike", () => {
+  it("builds from a tag no running app can see", () => {
     // GitHub publishes a pushed tag to `releases.atom` immediately, while this
     // workflow takes ten minutes. A pushed RELEASE tag therefore advertised a
     // version whose manifest did not exist yet, and every running app that
@@ -214,9 +214,16 @@ describe("the Electron release workflow", () => {
     // Both shapes wear the prefix: a bare `v…` pattern on either one would
     // reintroduce the advertised-but-absent window for that channel.
     expect(workflow).toContain('- "build/v[0-9]+.[0-9]+.[0-9]+"');
-    expect(workflow).toContain('- "build/v[0-9]+.[0-9]+.[0-9]+-electron.[0-9]+"');
     expect(workflow).not.toContain('- "v[0-9]+.[0-9]+.[0-9]+');
     expect(workflow).not.toContain('- "electron-v');
+  });
+
+  it("pauses prerelease tags while builds through 1.2.0 would install them", () => {
+    // Those builds check with `allowPrerelease` on and take the feed's newest
+    // entry, so a promoted `-electron.N` release would move every stable
+    // install onto the `electron` channel for good (DECK-103).
+    expect(workflow).not.toContain('- "build/v[0-9]+.[0-9]+.[0-9]+-electron.[0-9]+"');
+    expect(workflow).toContain("Prerelease tags are paused");
   });
 
   it("builds Windows on a windows runner and publishes into the same draft", () => {
