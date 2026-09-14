@@ -3,7 +3,7 @@ import { BRAND_ICON_SRC, renderStagePane, renderStageRail, renderStageStrip } fr
 import { RELEASES_URL, REPO_URL, WINDOWS_FALLBACK_URL } from "../download-links.js";
 import { renderQuickInstall } from "../install-command.js";
 import { renderAppleIcon, renderWindowsIcon } from "../os-icons.js";
-import { CHANGELOG_URL, LANDING_URL } from "../site-urls.js";
+import { CHANGELOG_URL, FEEDBACK_URL, LANDING_URL } from "../site-urls.js";
 import {
   STAGE_ARIA_LABEL,
   mountStageStream,
@@ -151,6 +151,9 @@ export function renderDirectionA(copy) {
             <span class="a-topbar__descriptor">Windows + macOS / PTY field</span>
             <a class="a-topbar__changelog" href="${CHANGELOG_URL}">
               <span data-copy="navChangelog">${copy.navChangelog}</span>
+            </a>
+            <a class="a-topbar__changelog a-topbar__feedback" href="${FEEDBACK_URL}">
+              <span data-copy="navFeedback">${copy.navFeedback}</span>
             </a>
             <a
               class="a-topbar__discord"

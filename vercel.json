@@ -28,6 +28,14 @@
     {
       "source": "/changelog/",
       "destination": "/landing-prototype/changelog/index.html"
+    },
+    {
+      "source": "/feedback",
+      "destination": "/landing-prototype/feedback/index.html"
+    },
+    {
+      "source": "/feedback/",
+      "destination": "/landing-prototype/feedback/index.html"
     }
   ],
   "headers": [
@@ -96,6 +104,16 @@
     {
       "source": "/landing-prototype/changelog/",
       "destination": "/changelog",
+      "permanent": true
+    },
+    {
+      "source": "/landing-prototype/feedback",
+      "destination": "/feedback",
+      "permanent": true
+    },
+    {
+      "source": "/landing-prototype/feedback/",
+      "destination": "/feedback",
       "permanent": true
     }
   ]

@@ -208,6 +208,7 @@ export default defineConfig({
       input: {
         landing: resolve(import.meta.dirname, "index.html"),
         changelog: resolve(import.meta.dirname, "changelog/index.html"),
+        feedback: resolve(import.meta.dirname, "feedback/index.html"),
       },
     },
   },

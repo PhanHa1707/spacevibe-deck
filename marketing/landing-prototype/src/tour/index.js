@@ -15,6 +15,7 @@ import { BRAND_ICON_SRC } from "../appwin.js";
 import { FEATURES_ID } from "../directions/a.js";
 import { PROOF_TERM_STEPS } from "./stage-states.js";
 import { RELEASES_URL, REPO_URL, WINDOWS_FALLBACK_URL } from "../download-links.js";
+import { FEEDBACK_URL } from "../site-urls.js";
 import { SCENES } from "./panel-scenes.js";
 import { renderAppleIcon, renderWindowsIcon } from "../os-icons.js";
 
@@ -351,6 +352,7 @@ function renderFooter(copy) {
           <span class="site-footer__coltitle" data-copy="footerColProject">${copy.footerColProject}</span>
           <a href="${REPO_URL}" target="_blank" rel="noreferrer" data-copy="navGithub">${copy.navGithub}</a>
           <a href="${REPO_URL}/releases" target="_blank" rel="noreferrer" data-copy="footerReleases">${copy.footerReleases}</a>
+          <a href="${FEEDBACK_URL}" data-copy="navFeedback">${copy.navFeedback}</a>
           <a href="${REPO_URL}/issues" target="_blank" rel="noreferrer" data-copy="footerIssues">${copy.footerIssues}</a>
           <a href="${REPO_URL}/blob/main/LICENSE" target="_blank" rel="noreferrer" data-copy="footerLicense">${copy.footerLicense}</a>
         </nav>
