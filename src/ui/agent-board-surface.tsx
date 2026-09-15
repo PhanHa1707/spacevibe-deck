@@ -9,7 +9,8 @@
  * measured size and taking the stage back costs no xterm reflow and no PTY
  * resize round-trip (spec §4.1).
  *
- * The Board-local actions — select and both filters — are bound here, because
+ * The Board-local actions — select, both filters and DL-34.11's two layout
+ * toggles — are bound here, because
  * they move nothing outside the Board's own store. Everything that reaches a
  * pane, a tab or the stage's occupant (`onStop`, `onRestart`, `onClose`,
  * `onOpenInStage`, `onReply`, `onNewAgent`, `onEscape`) is handed in by `App`,
@@ -20,6 +21,8 @@ import type { AgentBoardView } from "./agent-board-model";
 import type { BoardPanelState } from "./agent-board-panel";
 import {
   agentBoardSurfaceActive,
+  boardDensity,
+  boardGroupByProject,
   boardProjectFilter,
   boardStatusFilter,
   selectBoardCard,
@@ -72,10 +75,22 @@ export function AgentBoardSurface(props: AgentBoardSurfaceProps) {
     onProjectFilter: (key) => {
       boardProjectFilter.value = key;
     },
+    onGroupByProject: (grouped) => {
+      boardGroupByProject.value = grouped;
+    },
+    onDensity: (density) => {
+      boardDensity.value = density;
+    },
   };
   return (
     <div class="stage__surface stage__surface--agent-board">
-      <AgentBoard view={view} actions={actions} panel={props.panel} />
+      <AgentBoard
+        view={view}
+        actions={actions}
+        panel={props.panel}
+        grouped={boardGroupByProject.value}
+        density={boardDensity.value}
+      />
     </div>
   );
 }

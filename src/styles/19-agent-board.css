@@ -137,10 +137,88 @@
   overflow-y: auto;
 }
 
-.agent-board__heading {
+/* ── bar (DL-34.11) ─────────────────────────────────────────────────────────
+   One short row above the grid: `All` / `Needs me`, then group by project and
+   cards / list. The toggles are a CHOICE between views, so the chosen one
+   wears DL-21.1's selection wash — not DL-21.8's surface toggle, which paints
+   nothing because the surface it opens is its own readout. */
+.board-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.board-bar__group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.board-bar__gap {
+  width: 8px;
+}
+
+.board-bar__chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--type-meta); /* DL-34.5 */
+  cursor: pointer;
+  transition: background-color var(--duration) var(--ease); /* DL-21.5 */
+}
+
+.board-bar__chip--icon {
+  width: 24px;
+  padding: 0;
+}
+
+.board-bar__chip:hover {
+  background: var(--state-hover-bg); /* DL-21.2 */
+}
+
+.board-bar__chip[aria-pressed="true"] {
+  background: var(--tab-active-bg); /* DL-21.1 */
+  color: var(--text-primary);
+}
+
+.board-bar__chip:focus-visible {
+  outline: 2px solid var(--accent); /* DL-21.3 */
+  outline-offset: -2px;
+}
+
+.board-bar__count {
   font-size: var(--type-meta);
   color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; /* DL-4.2 */
+}
+
+/* A group header is a full-width row of the ONE grid (DL-34.11), so the
+   column count and the hit order the keys read stay a single answer. */
+.agent-board__group {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.agent-board__group:first-child {
+  margin-top: 0;
+}
+
+.agent-board__none {
+  color: var(--text-muted);
 }
 
 .agent-board__grid {
@@ -456,6 +534,65 @@
 .board-card__menu-row:focus-visible {
   background: var(--state-hover-bg);
   outline: none;
+}
+
+/* ── list layout (DL-34.11) ─────────────────────────────────────────────────
+   The SAME card, re-laid as one line: state, logo + repo, checkout, what it
+   said, age, rank. Its wash, frame and DL-34.3 colours stay; only placement
+   changes, so the press, the actions and the keys are the card's own. The
+   trailing unnamed track is the hover column's room, so it never covers the
+   rank. */
+.agent-board__grid[data-density="list"] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+
+.agent-board__grid[data-density="list"] .board-card {
+  --board-agent-glyph-size: 15px;
+  grid-template-columns:
+    96px minmax(0, 170px) minmax(0, 130px) minmax(0, 1fr) max-content max-content
+    50px;
+  grid-template-areas: "status id checkout what meta num .";
+  align-items: center;
+  column-gap: 12px;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.agent-board__grid[data-density="list"] .board-card__id,
+.agent-board__grid[data-density="list"] .board-card__what,
+.agent-board__grid[data-density="list"] .board-card__meta {
+  margin-top: 0;
+}
+
+.agent-board__grid[data-density="list"] .board-card > .board-card__checkout {
+  justify-self: start;
+}
+
+.agent-board__grid[data-density="list"] .board-card__where {
+  font-size: var(--type-body);
+}
+
+/* One line, not the card's two: a list row is one height by construction. */
+.agent-board__grid[data-density="list"] .board-card__what {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  min-height: 0;
+}
+
+.agent-board__grid[data-density="list"] .board-card__meta {
+  padding-inline-end: 0;
+}
+
+.agent-board__grid[data-density="list"] .board-card__actions {
+  bottom: 5px;
+}
+
+/* Downward in a row: the card's upward menu would leave the scroll box above
+   the first rows, where overflow cannot be scrolled to. */
+.agent-board__grid[data-density="list"] .board-card__menu {
+  bottom: auto;
+  top: calc(100% - 4px);
 }
 
 /* ── panel (DL-34.6, DL-34.7) ── */

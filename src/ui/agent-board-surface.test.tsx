@@ -14,6 +14,8 @@ import type { BoardPanelState } from "./agent-board-panel";
 import type { PaneView, TabView } from "../terminal/tabs-store";
 import {
   agentBoardSurfaceActive,
+  boardDensity,
+  boardGroupByProject,
   boardHeldOrder,
   boardSelectedPaneId,
   boardStatusFilter,
@@ -110,14 +112,28 @@ describe("AgentBoardSurface", () => {
     expect(agentBoardSurfaceActive.value).toBe(true);
   });
 
-  // DECK-43: the nav that carried the STATUS/PROJECTS rows is unmounted. The
-  // filter signals and their bindings survive (the §24 precedent) — this
-  // states that nothing on screen writes them any more.
-  it("draws no filter nav to route a press from", () => {
+  // DECK-43: the nav that carried the STATUS/PROJECTS rows is unmounted.
+  // DL-34.11's bar is what writes the status filter now, along with the two
+  // layout toggles — all Board-local, so the surface binds them itself.
+  it("routes the bar, not a nav, to the Board-local store", () => {
     openAgentBoard();
     const host = mount(someView());
     expect(host.querySelectorAll(".board-nav__row")).toHaveLength(0);
     expect(boardStatusFilter.value).toBe("all");
+    const press = (label: string): void => {
+      const button = [...host.querySelectorAll<HTMLButtonElement>(".board-bar__chip")].find(
+        (entry) => (entry.getAttribute("aria-label") ?? entry.textContent ?? "").startsWith(label),
+      )!;
+      act(() => {
+        button.click();
+      });
+    };
+    press("Needs me");
+    expect(boardStatusFilter.value).toBe("needs");
+    press("Group by project");
+    expect(boardGroupByProject.value).toBe(true);
+    press("List");
+    expect(boardDensity.value).toBe("list");
   });
 
   it("opens the pressed card's pane instead of selecting it", () => {

@@ -1,10 +1,13 @@
 import { PlusSquare } from "@phosphor-icons/react";
+import { Fragment } from "preact";
 import { useRef, useState } from "preact/hooks";
+import { AgentBoardBar } from "./agent-board-bar";
 import { AgentBoardCard, type BoardCardActions } from "./agent-board-card";
 import {
   cardForDigit,
   type AgentBoardView,
   type BoardCard,
+  type BoardDensity,
   type BoardStatusFilter,
 } from "./agent-board-model";
 import type { BoardPanelState } from "./agent-board-panel";
@@ -24,6 +27,11 @@ import { DeckIcon, ROW_ICON } from "./controls/deck-icon";
  * mounts them, so `view.selected` stays null and the panel's snapshot timer
  * never has a selection to refresh.
  *
+ * Above the grid sits DL-34.11's bar (DECK-118): `All` / `Needs me`, group by
+ * project, cards or list. Both layouts render the same `AgentBoardCard` inside
+ * the same grid, so the press, the actions and the keys below are one code
+ * path whichever layout is showing.
+ *
  * Presentational — every fact arrives in `view` and every effect leaves through
  * `actions`, so the gallery mounts the real thing over a fixture and the wiring
  * binds it to the stores without touching this file.
@@ -32,6 +40,8 @@ export interface AgentBoardActions extends BoardCardActions {
   onReply(card: BoardCard, text: string): void;
   onStatusFilter(filter: BoardStatusFilter): void;
   onProjectFilter(key: string | null): void;
+  onGroupByProject(grouped: boolean): void;
+  onDensity(density: BoardDensity): void;
   onNewAgent(): void;
   onEscape(): void;
 }
@@ -44,6 +54,8 @@ export interface AgentBoardProps {
    * is what a revert re-mounts, and `App` computes it either way.
    */
   readonly panel: BoardPanelState;
+  readonly grouped: boolean;
+  readonly density: BoardDensity;
 }
 
 // jsdom lays out no grid at all, so `getComputedStyle` never reports real
@@ -59,12 +71,20 @@ function columnCount(grid: HTMLDivElement | null): number {
   return tracks.split(" ").length;
 }
 
-export function AgentBoard({ view, actions }: AgentBoardProps) {
+/** What an empty FILTER says — the empty Board keeps its own launcher. */
+function noneText(filter: BoardStatusFilter): string {
+  return filter === "needs" ? "Nothing needs you" : "No agents match";
+}
+
+export function AgentBoard({ view, actions, grouped, density }: AgentBoardProps) {
   const [focusedPaneId, setFocusedPaneId] = useState<number | null>(null);
   const grid = useRef<HTMLDivElement>(null);
+  // The order the cards are DRAWN in, which is what focus walks: grouping
+  // puts each checkout's cards together, so it is not always `view.cards`.
+  const ordered = grouped ? view.groups.flatMap((group) => group.cards) : view.cards;
   const focusIndex = Math.max(
     0,
-    view.cards.findIndex((card) => card.paneId === focusedPaneId),
+    ordered.findIndex((card) => card.paneId === focusedPaneId),
   );
 
   const focusCard = (index: number): void => {
@@ -78,7 +98,7 @@ export function AgentBoard({ view, actions }: AgentBoardProps) {
     // focused card does — the chord is kept because it is the one a user who
     // learned it already presses.
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-      const focused = view.cards[focusIndex];
+      const focused = ordered[focusIndex];
       if (focused !== undefined) {
         event.preventDefault();
         actions.onOpenInStage(focused);
@@ -93,7 +113,7 @@ export function AgentBoard({ view, actions }: AgentBoardProps) {
       actions.onOpenInStage(digit);
       return;
     }
-    const last = view.cards.length - 1;
+    const last = ordered.length - 1;
     const columns = columnCount(grid.current);
     const moves: Record<string, number> = {
       ArrowRight: focusIndex + 1,
@@ -119,10 +139,22 @@ export function AgentBoard({ view, actions }: AgentBoardProps) {
     actions.onEscape();
   };
 
+  const renderCard = (card: BoardCard) => (
+    // Each card owns local menu state (Task 8); a stable key per pane id keeps
+    // that state from leaking onto a different card when the grid re-sorts,
+    // re-filters or regroups.
+    <AgentBoardCard
+      key={card.paneId}
+      card={card}
+      actions={actions}
+      tabIndex={card.paneId === ordered[focusIndex]?.paneId ? 0 : -1}
+      onFocusRequest={(focused) => setFocusedPaneId(focused.paneId)}
+    />
+  );
+
   return (
     <section class="agent-board" aria-label="Agent Board" onKeyDown={onRootKey}>
       <div class="agent-board__main">
-        <div class="agent-board__heading" role="status">{`${view.shown} of ${view.total}`}</div>
         {view.total === 0 ? (
           <div class="agent-board__empty">
             <span>No agents running</span>
@@ -136,20 +168,43 @@ export function AgentBoard({ view, actions }: AgentBoardProps) {
             </button>
           </div>
         ) : (
-          <div class="agent-board__grid" ref={grid} onKeyDown={onGridKey}>
-            {view.cards.map((card, index) => (
-              // Each card owns local menu state (Task 8); a stable key per
-              // pane id keeps that state from leaking onto a different card
-              // when the grid re-sorts or re-filters.
-              <AgentBoardCard
-                key={card.paneId}
-                card={card}
-                actions={actions}
-                tabIndex={index === focusIndex ? 0 : -1}
-                onFocusRequest={(focused) => setFocusedPaneId(focused.paneId)}
-              />
-            ))}
-          </div>
+          <>
+            <AgentBoardBar
+              view={view}
+              grouped={grouped}
+              density={density}
+              onStatusFilter={actions.onStatusFilter}
+              onGroupByProject={actions.onGroupByProject}
+              onDensity={actions.onDensity}
+            />
+            {view.shown === 0 ? (
+              <div class="agent-board__none" role="status">
+                {noneText(view.filter)}
+              </div>
+            ) : (
+              <div
+                class="agent-board__grid"
+                data-density={density}
+                ref={grid}
+                onKeyDown={onGridKey}
+              >
+                {grouped
+                  ? view.groups.map((group) => (
+                      // One grid with full-width header rows rather than a grid
+                      // per group, so the column count and the hit order the
+                      // keys read stay a single answer.
+                      <Fragment key={group.key}>
+                        <div class="agent-board__group">
+                          <span class="board-label">{group.label}</span>
+                          <span class="board-bar__count">{group.cards.length}</span>
+                        </div>
+                        {group.cards.map(renderCard)}
+                      </Fragment>
+                    ))
+                  : view.cards.map(renderCard)}
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>

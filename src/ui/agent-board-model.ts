@@ -18,8 +18,16 @@ import {
  * have yet (`ordinal`, `startedAt`, the task, `lastAgent`, confidence) arrive
  * as input maps until the wiring plan puts them on `PaneView`.
  */
-export type BoardStatusFilter = "all" | RailState;
+export type BoardStatusFilter = "all" | "needs" | RailState;
 export type BoardConfidence = "explicit" | "inferred";
+/** The Board's two layouts of the same cards (DL-34.11). */
+export type BoardDensity = "cards" | "list";
+
+/**
+ * What `Needs me` keeps (DL-34.11): a question or a failure. `asked` already
+ * folds in a finished run nobody has read (the rail's rule), so that counts.
+ */
+const NEEDS_YOU: ReadonlySet<RailState> = new Set<RailState>(["asked", "failed"]);
 
 export interface AgentBoardInput extends AgentRailInput {
   readonly ordinals: ReadonlyMap<number, number>;
@@ -86,13 +94,25 @@ export interface BoardProjectRow {
   readonly active: boolean;
 }
 
+/** One checkout's visible cards, in rank order, for the grouped layout. */
+export interface BoardGroup {
+  readonly key: string;
+  readonly label: string;
+  readonly cards: readonly BoardCard[];
+}
+
 export interface AgentBoardView {
   readonly all: readonly BoardCard[];
   readonly cards: readonly BoardCard[];
   readonly total: number;
   readonly shown: number;
+  readonly filter: BoardStatusFilter;
+  /** `Needs me`'s count, over every card rather than the filtered set. */
+  readonly needs: number;
   readonly status: readonly BoardStatusRow[];
   readonly projects: readonly BoardProjectRow[];
+  /** `cards` split by checkout in the rail's order; empty checkouts dropped. */
+  readonly groups: readonly BoardGroup[];
   readonly selected: BoardCard | null;
 }
 
@@ -316,7 +336,11 @@ function toCard(
 }
 
 function visible(card: BoardCard, input: AgentBoardInput): boolean {
-  if (input.statusFilter !== "all" && card.state !== input.statusFilter) return false;
+  if (input.statusFilter === "needs") {
+    if (!NEEDS_YOU.has(card.state)) return false;
+  } else if (input.statusFilter !== "all" && card.state !== input.statusFilter) {
+    return false;
+  }
   if (input.projectFilter !== null && card.checkoutKey !== input.projectFilter) return false;
   return true;
 }
@@ -397,13 +421,25 @@ export function buildAgentBoard(input: AgentBoardInput): AgentBoardView {
       });
     }
   }
+  // Rank order inside a group, never state: grouping must not bring back the
+  // card that moves under the pointer (DECK-72).
+  const groups: BoardGroup[] = projects
+    .map((project) => ({
+      key: project.key,
+      label: project.label,
+      cards: cards.filter((card) => card.checkoutKey === project.key),
+    }))
+    .filter((group) => group.cards.length > 0);
   return {
     all,
     cards,
     total: all.length,
     shown: cards.length,
+    filter: input.statusFilter,
+    needs: all.filter((card) => NEEDS_YOU.has(card.state)).length,
     status,
     projects,
+    groups,
     selected: all.find((card) => card.selected) ?? null,
   };
 }

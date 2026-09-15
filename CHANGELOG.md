@@ -56,6 +56,14 @@ settings, and keeps agent cards steady while their state changes.
   choice.
 
 - **Claude Signals also covers manual launches in Deck.** Enabling Signals registers
+### Agent Board
+
+- **See only the agents waiting on you.** A bar above the
+  [Agent Board](src/ui/agent-board-bar.tsx) switches between All and Needs me:
+  agents asking a question, finished runs you have not read, and failures. You
+  can also group the cards by project, or switch to a one-line list when many
+  agents are running.
+
   Deck's guarded hooks in your Claude settings; turning it off removes those hooks.
   Claude launch commands no longer receive extra settings or session-ID flags.
 

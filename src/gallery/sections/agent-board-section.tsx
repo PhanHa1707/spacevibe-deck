@@ -5,6 +5,7 @@ import { AgentBoard, type AgentBoardActions } from "../../ui/agent-board";
 import {
   buildAgentBoard,
   type AgentBoardInput,
+  type BoardDensity,
   type BoardStatusFilter,
 } from "../../ui/agent-board-model";
 import type { BoardPanelState } from "../../ui/agent-board-panel";
@@ -168,6 +169,8 @@ const NOOP: AgentBoardActions = {
   onReply: () => {},
   onStatusFilter: () => {},
   onProjectFilter: () => {},
+  onGroupByProject: () => {},
+  onDensity: () => {},
   onNewAgent: () => {},
   onEscape: () => {},
 };
@@ -213,6 +216,8 @@ function LiveBoard() {
   const status = useSignal<BoardStatusFilter>("all");
   const project = useSignal<string | null>(null);
   const held = useSignal<readonly number[] | null>(null);
+  const grouped = useSignal(false);
+  const density = useSignal<BoardDensity>("cards");
   const view = buildAgentBoard({
     ...BASE,
     selectedPaneId: selected.value,
@@ -232,6 +237,12 @@ function LiveBoard() {
     onProjectFilter: (key) => {
       project.value = key;
     },
+    onGroupByProject: (next) => {
+      grouped.value = next;
+    },
+    onDensity: (next) => {
+      density.value = next;
+    },
   };
   const panel: BoardPanelState =
     view.selected === null
@@ -243,7 +254,15 @@ function LiveBoard() {
           sending: false,
           paneExited: false,
         };
-  return <AgentBoard view={view} actions={actions} panel={panel} />;
+  return (
+    <AgentBoard
+      view={view}
+      actions={actions}
+      panel={panel}
+      grouped={grouped.value}
+      density={density.value}
+    />
+  );
 }
 
 export function AgentBoardSection() {
@@ -272,7 +291,7 @@ export function AgentBoardSection() {
     <>
       <SectionHead
         title="Agent Board"
-        blurb="The real AgentBoard over a fixture: two projects, three checkouts, nine cards through buildAgentBoard. Since DECK-43 the grid is the whole Board — no filter nav, no detail panel — and a press opens that agent's pane on the stage. `docs/internals/agent-board.md`, DL §34."
+        blurb="The real AgentBoard over a fixture: two projects, three checkouts, nine cards through buildAgentBoard. Since DECK-43 there is no filter nav and no detail panel, and a press opens that agent's pane on the stage; DL-34.11's bar above the grid filters All / Needs me, groups by project and switches cards / list. `docs/internals/agent-board.md`, DL §34."
       />
       {/* No `framed` and no `tall`: `.window` is a three-row grid, so an
           unplaced child lands on the frame row and the board is clipped to
@@ -286,12 +305,24 @@ export function AgentBoardSection() {
       </Specimen>
       <Specimen name="board — tabs but no agents (§4.4)" surface="bg">
         <div style={STAGE_SHORT}>
-          <AgentBoard view={emptyView} actions={NOOP} panel={PANEL_CLOSED} />
+          <AgentBoard
+            view={emptyView}
+            actions={NOOP}
+            panel={PANEL_CLOSED}
+            grouped={false}
+            density="cards"
+          />
         </div>
       </Specimen>
       <Specimen name="board — a filter that yields nothing (§4.4)" surface="bg">
         <div style={STAGE_SHORT}>
-          <AgentBoard view={filteredView} actions={NOOP} panel={PANEL_CLOSED} />
+          <AgentBoard
+            view={filteredView}
+            actions={NOOP}
+            panel={PANEL_CLOSED}
+            grouped={false}
+            density="cards"
+          />
         </div>
       </Specimen>
     </>

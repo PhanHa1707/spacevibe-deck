@@ -520,6 +520,7 @@ describe("DL-34 agent board", () => {
       "34.8",
       "34.9",
       "34.10",
+      "34.11",
     ]) {
       expect(rulebook).toContain(`**DL-${rule}**`);
     }

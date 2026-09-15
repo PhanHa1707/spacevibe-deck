@@ -332,3 +332,39 @@ describe("buildAgentBoard — hasRun", () => {
     expect(byId.get(31)?.hasRun).toBe(false);
   });
 });
+
+describe("buildAgentBoard — Needs me and groups (DL-34.11)", () => {
+  const needsYou = (state: string): boolean => state === "asked" || state === "failed";
+
+  it("keeps only asked and failed cards under Needs me, counting over every card", () => {
+    const everything = buildAgentBoard(input());
+    const expected = everything.all.filter((card) => needsYou(card.state));
+    expect(expected.length).toBeGreaterThan(0);
+    const needs = buildAgentBoard(input({ statusFilter: "needs" }));
+    expect(needs.filter).toBe("needs");
+    expect(needs.cards.map((card) => card.paneId)).toEqual(expected.map((card) => card.paneId));
+    // The count is over every card, so it does not move with the filter.
+    expect(everything.needs).toBe(expected.length);
+    expect(needs.needs).toBe(expected.length);
+  });
+
+  it("splits the visible cards by checkout in the rail's order, rank order inside", () => {
+    const view = buildAgentBoard(input());
+    expect(view.groups.map((group) => group.key)).toEqual(view.projects.map((row) => row.key));
+    const byId = (a: number, b: number): number => a - b;
+    expect(
+      view.groups.flatMap((group) => group.cards.map((card) => card.paneId)).sort(byId),
+    ).toEqual(view.cards.map((card) => card.paneId).sort(byId));
+    for (const group of view.groups) {
+      expect(group.cards.every((card) => card.checkoutKey === group.key)).toBe(true);
+      const ranks = group.cards.map((card) => card.rank);
+      expect(ranks).toEqual([...ranks].sort(byId));
+    }
+  });
+
+  it("drops a checkout with no visible card", () => {
+    const view = buildAgentBoard(input({ statusFilter: "needs" }));
+    expect(view.groups.every((group) => group.cards.length > 0)).toBe(true);
+    expect(view.groups.flatMap((group) => group.cards)).toHaveLength(view.shown);
+  });
+});

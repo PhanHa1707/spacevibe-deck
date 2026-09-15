@@ -1,6 +1,6 @@
 import { signal } from "@preact/signals";
 import { nextOpenSequence, UNSEQUENCED } from "../lib/open-sequence";
-import type { BoardStatusFilter } from "./agent-board-model";
+import type { BoardDensity, BoardStatusFilter } from "./agent-board-model";
 
 /**
  * The Agent Board's window-scoped state (spec §4.2, §11.3) — the browser
@@ -17,6 +17,9 @@ export const boardSelectedPaneId = signal<number | null>(null);
 export const boardStatusFilter = signal<BoardStatusFilter>("all");
 export const boardProjectFilter = signal<string | null>(null);
 export const boardHeldOrder = signal<readonly number[] | null>(null);
+/** DL-34.11's two layout toggles — Board-local like the filters above. */
+export const boardGroupByProject = signal(false);
+export const boardDensity = signal<BoardDensity>("cards");
 
 export function openAgentBoard(): void {
   if (!agentBoardOpen.value) {
@@ -46,6 +49,8 @@ function resetBoardLocal(): void {
   boardStatusFilter.value = "all";
   boardProjectFilter.value = null;
   boardHeldOrder.value = null;
+  boardGroupByProject.value = false;
+  boardDensity.value = "cards";
 }
 
 export function closeAgentBoard(): void {

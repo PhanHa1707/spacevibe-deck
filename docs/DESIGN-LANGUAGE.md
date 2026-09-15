@@ -3425,6 +3425,11 @@ Numbered 34 because §33 was the previous highest rule.
   card ever wears, and on it the state word fell under DL-3.5's floor in three
   of six cells (dark `FAILED` 4.32, light `FAILED` 4.30, light `ASKED` 3.43).
   Inside a selected card the word therefore takes a **second ink** —
+  **Amended 2026-09-15 (DECK-118):** DL-34.11's group headers wear
+  `.board-label` too — the same class, so DL-4.3's exception still names one
+  selector — and head their groups at `--type-meta`, the Board-scoped
+  exception DL-4.3's group-label clause already makes for `STATUS` and
+  `PROJECTS`.
   `--board-state-failed-ink` / `--board-state-asked-ink` /
   `--board-state-neutral-ink`, each the resting ink mixed 70% toward `--fg`,
   which lightens on a dark theme and darkens on a light one with no branch.
@@ -3451,7 +3456,9 @@ Numbered 34 because §33 was the previous highest rule.
 - **DL-34.8** **RETIRED 2026-09-09 (DECK-43) — the nav is unmounted.**
   [`AgentBoardNav`](../src/ui/agent-board-nav.tsx) `deprecated` still builds
   and keeps its suite, and `boardStatusFilter` / `boardProjectFilter` still
-  filter the model — nothing on screen writes them. The rule as written:
+  filter the model. Since 2026-09-15 DL-34.11's bar writes `boardStatusFilter`
+  again, with `all` and `needs` only; nothing on screen writes
+  `boardProjectFilter`. The rule as written:
   **the nav is STATUS then PROJECTS, live only, totals not filtered.** `Failed` appears only while some pane is `failed`; a PROJECTS
   row is a checkout holding at least one card; counts are totals and the
   grid's heading states the filtered result. **Each group is a real listbox
@@ -3465,6 +3472,25 @@ Numbered 34 because §33 was the previous highest rule.
   first press to absorb, so the branch is deleted rather than left unreachable.
 - **DL-34.10** **Stop leaves the shell and the card; Restart resumes the
   conversation and exists only once the agent has left; Close lives in
+- **DL-34.11** **One short bar above the grid filters and re-lays the Board,
+  and it carries only the controls used often (2026-09-15, DECK-118).** Left:
+  `All` and `Needs me` (`asked` + `failed`), each with its count over every
+  card, so a count never shrinks with the filter. Right: group by project,
+  then cards / list, as 24px icon buttons. The chosen chip and the chosen
+  toggles wear DL-21.1's `--tab-active-bg` wash: they pick between views of
+  the same cards, which is a selection, not DL-21.8's surface toggle. Per-state
+  chips were drawn and cut by the owner as rarely used, and the `N of M`
+  heading left with them. A group header is a full-width row of the one grid —
+  `.board-label` over the checkout's where-line, a faint count beside it — in
+  the rail's order; cards keep rank order inside a group, so grouping moves
+  nothing on a state change (DL-34.2). The list is the same card re-laid on
+  one line, with its wash, frame, DL-34.3 colours, press, hover column and keys
+  unchanged, and a trailing track kept for the hover column so it never covers
+  the rank. The empty Board has no bar and keeps its launcher; an empty filter
+  says so in one muted line with no launcher. Filter, grouping and layout are
+  Board-local and reset when the chip closes. See the
+  [bar](../src/ui/agent-board-bar.tsx) and the
+  [list rules](../src/styles/19-agent-board.css).
   `More`.** The hover column carries at most Stop-or-Restart, `Open in
   stage` and `More`; `More` carries all four rows. **Amended 2026-09-04, from
   the eye pass, twice.** `More` carries **every row the card's state admits**

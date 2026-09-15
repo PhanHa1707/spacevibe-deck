@@ -4,6 +4,8 @@ import {
   agentBoardOpen,
   agentBoardOpenedAt,
   agentBoardSurfaceActive,
+  boardDensity,
+  boardGroupByProject,
   boardHeldOrder,
   boardProjectFilter,
   boardSelectedPaneId,
@@ -48,8 +50,13 @@ describe("agent-board-store", () => {
     openAgentBoard();
     boardStatusFilter.value = "asked";
     boardProjectFilter.value = "deck";
+    boardGroupByProject.value = true;
+    boardDensity.value = "list";
     selectBoardCard(4, [4]);
     closeAgentBoard();
+    // DL-34.11: grouping and layout are Board-local like the filters.
+    expect(boardGroupByProject.value).toBe(false);
+    expect(boardDensity.value).toBe("cards");
     expect(agentBoardOpen.value).toBe(false);
     expect(agentBoardSurfaceActive.value).toBe(false);
     expect(agentBoardOpenedAt.value).toBe(UNSEQUENCED);
