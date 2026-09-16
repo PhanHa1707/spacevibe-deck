@@ -1153,38 +1153,26 @@ part of this design language instead of becoming a new widget genre: it is a
   cell and would put identical figures at different offsets on consecutive
   rows.
 
-## 16. The display figure
+## 16. Usage overview
 
-Approved as a fork on 2026-08-10, for the token usage overview. §15 governs a
-table of facts and §5 a row whose key carries one value; neither covers a
-screen whose entire job is to state **one number** and then account for it. The
-overview is not a denser table — it is a single figure with its own breakdown
-underneath, and these rules say how that stays part of this design language
-instead of becoming a dashboard genre with its own vocabulary. It is still a
-key beside a value and a fact on a surface; only the scale of the headline and
-the shape of the proportion are new.
+The owner-selected C hierarchy in [OverviewContent](../src/ui/usage/sections/overview-section.tsx)
+puts current allowance before historical cost. The two answer different questions:
+remaining subscription capacity comes from limit readings, while estimated API cost
+comes from this machine's recorded token history. Neither is a subscription invoice.
 
-- **DL-16.1** A screen may carry **at most one display figure**: the number the
-  screen exists to state. It is set at the DL-4.4 display size (40px), weight
-  600–700, `--text-primary`, `font-variant-numeric: tabular-nums` (DL-4.2).
-  A screen with two display figures has none — the second one demotes the
-  first to a heading and the reader no longer knows what the screen is about.
-  If a second number matters, it goes in the accounting below at ordinary
-  sizes, never at this one.
-- **DL-16.2** The display figure is introduced by an **eyebrow label**:
-  sentence-case microcopy (`Raw token cost`) at `--type-micro` (10.5px) in
-  `--text-muted`, with **no** tracking and no `text-transform`. Its whole job
-  is to name what the number is; the 40px figure under it already has all the
-  emphasis the pairing needs, and a label that shouts beside a figure that is
-  large is two things competing to be read first. **Amended 2026-08-16**,
-  reversing the 2026-08-10 fork: this label used to be the one sanctioned
-  uppercase in the app (`RAW TOKEN COST`) with letter-spacing 0.08em, both
-  written as deliberate exceptions to DL-4.3. The Native balanced direction
-  retired the exception rather than the eyebrow — DL-4.3 now bans styled
-  uppercase and tracking on readable copy with no exception at all, so there is
-  nothing here for another surface to cite. DL-15.5's sentence-case column
-  headers, which this rule used to have to defend itself against, are simply
-  what everything looks like now.
+- **DL-16.1** The order is **Remaining allowance → cost period → Cost over time →
+  Estimated API cost → per-agent accounting and pricing details**. The
+  [allowance table](../src/ui/usage/remaining-allowance.tsx) uses actual returned
+  durations, visible reset times and remaining percentages; missing, expired,
+  failed and unsupported readings stay unknown, while a measured zero stays zero.
+  Allowance is independent of the cost period and remains visible if token history
+  is loading or stale. Its sidebar counterpart retains DL-33.1's treatment.
+- **DL-16.2** The compact cost figure uses the sentence-case label **Estimated API
+  cost**, tabular numbers, and a visible API-equivalent disclaimer. The
+  [Overview treatment](../src/styles/12-usage.css) keeps allowance and the chart
+  above the accounting, with flat surfaces, hairlines and the existing theme tokens.
+  A partial price estimate must disclose the excluded models and tokens; an absent
+  amount is a dash, never an invented zero.
 - **DL-16.3** A **share bar** may sit under any row that names a part of a
   stated total: a full-width track 4px tall, radius 2px (half its own
   track — a capsule, a shape rather than a DL-20.1 scale value), track
@@ -1203,18 +1191,18 @@ the shape of the proportion are new.
   imply a limit the app does not know. When the total is unavailable, every
   bar renders as an empty track and no percentage is printed anywhere; a bar
   that fills against an unknown denominator is an invented number.
-- **DL-16.6** A share bar is **not interactive**: no hover treatment, no click
-  target, no tooltip carrying the only copy of a value. The DL-15.2 reasoning
-  applies unchanged — an affordance that reacts and then does nothing is a
-  broken promise. The percentage is always written in text beside the bar, so
-  the bar itself is `aria-hidden` and removing it would lose no information.
-- **DL-16.7** A display figure may carry a **range selector**, and it is the
-  only control permitted on a metric screen. It is not a setting and it is not
-  a filter over a list: it says **what period the figure covers**, so it
-  belongs to the figure exactly the way the `*` disclaimer does, and it sits
-  with the figure rather than in a toolbar. DL-15.2 is unchanged and still
-  governs the tables themselves — the selector sits outside them, and nothing
-  inside a metric table becomes interactive because this rule exists.
+- **DL-16.6** Share bars stay non-interactive and `aria-hidden`; the percentage
+  is also written as text in [agent accounting](../src/ui/usage/sections/overview-section.tsx).
+  The [cost timeline](../src/ui/usage/cost-timeline.tsx) may draw static stacked
+  columns in established agent colors with a visible legend, shared USD scale,
+  interval labels and actual covered boundaries. **Chart data** is a keyboard-accessible
+  disclosure with semantic row/column headers and exact formatted values, including
+  missing and unpriced data. Color and hover cannot be the sole source of meaning.
+- **DL-16.7** The [cost-period selector](../src/ui/usage/usage-range-selector.tsx)
+  sits between allowance and the chart. Today, 7 days, 30 days and All update the
+  chart, total, per-agent amounts, shares, tokens and price omissions together.
+  Current allowance and reset times do not change with this selection. **Chart data**
+  and **Pricing details** disclosures are allowed; the metric cells remain facts.
   - **Segmented, not a §6 `cycle` pill.** §6 says to extend its table before
     inventing a value kind, so the reason is recorded here: every period must
     be **visible at once**, because the set of available comparisons is itself
@@ -1230,8 +1218,8 @@ the shape of the proportion are new.
     a coloured chip, an underline or a border invented for this control. No
     shadow (DL-1.3). A reader who has learned what "active" looks like in
     Settings must not have to learn it twice.
-  - **Restate the range wherever it is implied.** Selecting a period changes
-    every number on the screen, so no figure, share or count may be left
+  - **Restate the range wherever it is implied.** Selecting a cost period changes
+    every historical cost and token number, so no figure, share or count may be left
     ambiguous about what it covers: the selected option stays visible beside
     them, and an empty period says which period is empty rather than only that
     something is missing. A number whose period the reader has to remember is

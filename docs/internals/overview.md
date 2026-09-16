@@ -82,6 +82,17 @@ awaited before first paint so an imported theme cannot flash.
 
 State is Preact signals; module stores are window-scoped (R5).
 
+The sidebar and mounted Usage Overview share one renderer allowance poll and focus
+listener through [the reference-counted observer](../../src/usage/agent-limits-store.ts).
+Only the final subscriber stops it; a reply from a stopped generation cannot update a
+reopened view. [The shared hook](../../src/ui/usage/use-agent-limits.ts) applies the same
+reset/TTL boundaries in both surfaces. Token polling remains owned by
+[UsageDockTab](../../src/ui/usage/usage-dock-tab.tsx), so token errors and limit errors
+must not hide the other source. Gallery specimens use
+[OverviewContent](../../src/ui/usage/sections/overview-section.tsx) with injected data,
+never the store-connected wrapper: a live limit read can activate a collector.
+
+
 ## The bridge and its contract
 
 The preload exposes exactly two functions on `window.__deckHost`, `invoke(channel, payload)`

@@ -7,6 +7,14 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 
 ## Unreleased
 
+### Usage
+
+- **See remaining allowance before historical cost.** The redesigned
+  [Usage overview](src/ui/usage/sections/overview-section.tsx) shows visible reset
+  times, a cost timeline for Today / 7 days / 30 days / All, and accessible chart
+  and pricing details. API-equivalent estimates distinguish missing history,
+  measured zero and unpriced tokens.
+
 ### Sidebar
 
 - **Agent usage replaces Unread.** The [compact sidebar summary](src/ui/usage/agent-usage-summary.tsx)
