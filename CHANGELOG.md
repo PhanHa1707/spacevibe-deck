@@ -23,6 +23,18 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
   status-line collector that preserves your existing status line on macOS/Linux.
   Missing or expired readings show a dash.
 
+### Agents
+
+- **Signals are off again after upgrading from 1.1.** Deck 1.1 saved every
+  agent's reporting switch as on, and 1.2.0 took that as your choice, so it kept
+  adding its hooks to your Claude and Codex settings. This update
+  [switches reporting off once](src/settings/signal-adapter-choice.ts) and
+  removes those hooks at launch. If you turned Signals on yourself in 1.2.0,
+  turn it on again under Settings → Agents.
+- **Codex no longer asks you to review your own hooks again.** Deck's Codex
+  hooks [stay where they are](electron/agent-hooks/codex-hooks.ts) when Deck
+  starts, instead of moving behind hooks you added later.
+
 ### Updates
 
 - **Update failures are easier to recover from.** Two consecutive failed checks
