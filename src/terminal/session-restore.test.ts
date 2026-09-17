@@ -396,7 +396,9 @@ describe("restoreSession", () => {
     const { deps, mocks } = createFakeDeps({ records, lookup });
     await restoreSession(deps, "main");
     const [intent] = mocks.materialize.mock.calls[0];
-    expect(intent.paneCommands).toEqual(["codex resume abc123"]);
+    // Codex's own resume form, with the flag Deck always types (DECK-121) and
+    // nothing folded in from the recorded launch command.
+    expect(intent.paneCommands).toEqual(["codex resume abc123 -c tui.animations=false"]);
   });
 
   it("restores a pane with no recorded options exactly as before", async () => {

@@ -38,7 +38,9 @@ describe("resumeSession", () => {
   it("uses codex's own resume form", async () => {
     const d = deps();
     await resumeSession(entry({ agent: "codex", sessionId: "abc123" }), d);
-    expect(vi.mocked(d.materialize).mock.calls[0][0].paneCommands).toEqual(["codex resume abc123"]);
+    expect(vi.mocked(d.materialize).mock.calls[0][0].paneCommands).toEqual([
+      "codex resume abc123 -c tui.animations=false",
+    ]);
   });
 
   // A dead cwd landing in $HOME is worse than not resuming (spec §4).

@@ -327,7 +327,7 @@ describe("LaunchProfileEditor", () => {
     expect(inPanel("claude", "No approvals or sandbox")).toBeNull();
     // The field holds the whole command, so focusing it shows what launches.
     expect((byLabel("Command for Codex") as HTMLInputElement).value).toBe(
-      "codex --dangerously-bypass-approvals-and-sandbox",
+      "codex --dangerously-bypass-approvals-and-sandbox -c tui.animations=false",
     );
   });
 

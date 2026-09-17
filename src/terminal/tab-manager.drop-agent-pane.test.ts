@@ -78,7 +78,7 @@ describe("createTabManager dropAgentPane", () => {
     expect(tabViews.value.length).toBe(tabCount);
     expect(tm.allPaneIds()).toEqual([1, 2]);
     expect(pty.writes).toEqual([
-      { id: 2, data: "codex --dangerously-bypass-approvals-and-sandbox\r" },
+      { id: 2, data: "codex --dangerously-bypass-approvals-and-sandbox -c tui.animations=false\r" },
     ]);
     tm.dispose();
   });
