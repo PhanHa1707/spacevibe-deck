@@ -18,7 +18,7 @@ const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 
 /**
  * A fresh id for a new draft, or "" where the browser has no crypto.randomUUID
- * (insecure context) — the Worker then creates the issue without one.
+ * (insecure context) — sending then stays blocked instead of losing idempotency.
  */
 export function newDraftId() {
   return globalThis.crypto?.randomUUID?.() ?? "";

@@ -7,6 +7,13 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 
 ## Unreleased
 
+### Feedback
+
+- The [feedback page](marketing/landing-prototype/src/feedback.js) supports Google sign-in,
+  durable private submissions, owner-approved public descriptions, older feedback pages,
+  and approval/progress email updates. Sending remains closed until service configuration
+  and rollout verification are complete.
+
 ### Usage
 
 - **See remaining allowance before historical cost.** The redesigned

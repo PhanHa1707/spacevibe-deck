@@ -53,6 +53,8 @@ export function renderBoardSection(copy) {
       <p class="feedback-board__status" data-board-status hidden></p>
       <div class="feedback-tabs" role="group" aria-label="${copy.feedbackBoardTitle}">${renderTabs(copy)}</div>
       <div class="feedback-columns">${renderColumns(copy)}</div>
+      <p class="feedback-board__status" data-page-status role="status"></p>
+      <button type="button" class="feedback-pill feedback-pill--ghost" data-board-more hidden>Load older feedback</button>
     </section>
   `;
 }
@@ -89,7 +91,7 @@ function createCard(item, copy, locale, index) {
 
   const id = document.createElement("span");
   id.className = "feedback-card__id";
-  id.textContent = item.id;
+  id.textContent = item.identifier || item.id;
   top.append(tag, id);
 
   // User-submitted text: always textContent, never markup.
@@ -103,7 +105,10 @@ function createCard(item, copy, locale, index) {
   time.dataset.feedbackDate = item.updatedAt;
   time.textContent = formatRelativeDay(item.updatedAt, locale);
 
-  card.append(top, title, time);
+  const description = document.createElement("p");
+  description.className = "feedback-card__description";
+  description.textContent = item.description;
+  card.append(top, title, description, time);
   return card;
 }
 

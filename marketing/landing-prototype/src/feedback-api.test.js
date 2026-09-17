@@ -1,76 +1,117 @@
 import { describe, expect, it } from "vitest";
-
-import { FeedbackSubmitError, groupFeedbackBoard, submitFeedback } from "./feedback-api.js";
+import {
+  FeedbackSubmitError,
+  groupFeedbackBoard,
+  submitFeedback,
+  fetchFeedbackBoard,
+  fetchFeedbackConfig,
+} from "./feedback-api.js";
 
 const card = (overrides) => ({
-  id: "DECK-1",
+  id: "report-id",
   title: "Split panes",
+  description: "Steps",
   category: "idea",
   status: "pending",
   updatedAt: "2026-09-14T10:00:00.000Z",
   ...overrides,
 });
+const json = (value, status = 200) => new Response(JSON.stringify(value), { status });
 
-describe("groupFeedbackBoard", () => {
-  it("groups by status, newest first, and drops malformed items", () => {
+describe("public board", () => {
+  it("groups approved cards and drops malformed/private cards", () => {
     const board = groupFeedbackBoard({
       items: [
-        card({ id: "DECK-2", updatedAt: "2026-09-12T10:00:00.000Z" }),
-        card({ id: "DECK-3" }),
-        card({ id: "DECK-4", status: "done" }),
-        card({ id: "DECK-5", status: "backlog" }),
-        card({ id: "DECK-6", title: "" }),
-        { id: "DECK-7" },
+        card({ id: "older", updatedAt: "2026-09-12T00:00:00Z" }),
+        card({ id: "newer" }),
+        card({ id: "done", status: "done" }),
+        card({ status: "private" }),
+        card({ description: undefined }),
       ],
     });
-
-    expect(board.pending.map((item) => item.id)).toEqual(["DECK-3", "DECK-2"]);
+    expect(board.pending.map((x) => x.id)).toEqual(["newer", "older"]);
     expect(board.review).toEqual([]);
-    expect(board.done.map((item) => item.id)).toEqual(["DECK-4"]);
-  });
-
-  it("rejects a response without an items list", () => {
+    expect(board.done.map((x) => x.id)).toEqual(["done"]);
     expect(() => groupFeedbackBoard({})).toThrow();
+  });
+  it("requests older pages without auth and preserves the next cursor", async () => {
+    let requested;
+    const page = await fetchFeedbackBoard("123:uuid", async (url, init) => {
+      requested = { url, init };
+      return json({ items: [card()], nextCursor: "122:uuid" });
+    });
+    expect(new URL(requested.url).searchParams.get("cursor")).toBe("123:uuid");
+    expect(requested.init.headers.authorization).toBeUndefined();
+    expect(page.nextCursor).toBe("122:uuid");
+    expect(page.board.pending).toHaveLength(1);
+    await expect(
+      fetchFeedbackBoard(null, async () => json({ items: [], nextCursor: {} })),
+    ).rejects.toThrow();
   });
 });
 
-describe("submitFeedback", () => {
-  const input = { title: "Split panes", body: "", category: "idea", website: "", id: "" };
-
-  it("names the draft's id when it has one, with a timeout on the request", async () => {
-    const sent = [];
-    const capture = async (_url, init) => {
-      sent.push({ body: JSON.parse(init.body), signal: init.signal });
-      return new Response(null, { status: 204 });
-    };
-    const id = "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed";
-
-    await submitFeedback({ ...input, id }, capture);
-    await submitFeedback(input, capture);
-
-    expect(sent[0].body.id).toBe(id);
-    expect("id" in sent[1].body).toBe(false);
-    expect(sent[0].signal).toBeInstanceOf(AbortSignal);
+describe("durable submission", () => {
+  const input = {
+    title: "Split panes",
+    body: "",
+    category: "idea",
+    website: "",
+    id: "draft-uuid",
+    credential: "google-credential",
+  };
+  it("sends auth only in the header and accepts a persisted receipt", async () => {
+    let sent;
+    await submitFeedback(input, async (_url, init) => {
+      sent = init;
+      return json({ id: "stored-id", status: "private" }, 201);
+    });
+    expect(sent.headers.authorization).toBe("Bearer google-credential");
+    expect(JSON.parse(sent.body)).toEqual({
+      title: input.title,
+      body: "",
+      category: "idea",
+      website: "",
+      id: "draft-uuid",
+    });
+    expect(sent.signal).toBeInstanceOf(AbortSignal);
   });
-
-  const respond = (status) => async () => new Response(null, { status });
-
-  it("maps the Worker's status codes to a reason", async () => {
-    await expect(submitFeedback(input, respond(204))).resolves.toBeUndefined();
-
+  it("never treats an empty or malformed success response as persisted feedback", async () => {
+    for (const response of [
+      new Response(null, { status: 204 }),
+      json({ status: "private" }, 201),
+      json({ id: "x", status: "public" }, 201),
+    ]) {
+      await expect(submitFeedback(input, async () => response)).rejects.toBeInstanceOf(
+        FeedbackSubmitError,
+      );
+    }
+  });
+  it("distinguishes sign-in expiry and idempotency conflicts from retryable errors", async () => {
     for (const [status, reason] of [
       [400, "invalid"],
       [413, "invalid"],
+      [401, "auth"],
+      [409, "conflict"],
       [429, "rate"],
       [503, "server"],
     ]) {
-      await expect(submitFeedback(input, respond(status))).rejects.toMatchObject({ reason });
+      await expect(
+        submitFeedback(input, async () => new Response(null, { status })),
+      ).rejects.toMatchObject({ reason });
     }
-
     await expect(
       submitFeedback(input, async () => {
-        throw new TypeError("offline");
+        throw new Error("offline");
       }),
-    ).rejects.toBeInstanceOf(FeedbackSubmitError);
+    ).rejects.toMatchObject({ reason: "server" });
+  });
+});
+
+describe("feedback configuration", () => {
+  it("validates provider config without treating a server error as open intake", async () => {
+    const config = { googleClientId: "test-client", submissionsOpen: false };
+    expect(await fetchFeedbackConfig(async () => json(config))).toEqual(config);
+    await expect(fetchFeedbackConfig(async () => json({}))).rejects.toThrow();
+    await expect(fetchFeedbackConfig(async () => json({}, 503))).rejects.toThrow();
   });
 });

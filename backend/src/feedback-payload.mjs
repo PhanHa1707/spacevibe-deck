@@ -9,7 +9,7 @@ export const FEEDBACK_CATEGORIES = ["bug", "idea", "other"];
 export const TITLE_MIN = 3;
 export const TITLE_MAX = 120;
 export const BODY_MAX = 2000;
-const REQUIRED_FIELDS = ["title", "category"];
+const REQUIRED_FIELDS = ["title", "category", "id"];
 // `website` is a honeypot the landing keeps out of layout, where neither a
 // person nor browser autofill can reach it; `id` is the draft's UUID v4.
 const OPTIONAL_FIELDS = ["body", "website", "id"];
@@ -41,7 +41,7 @@ export function parseFeedback(value) {
     !REQUIRED_FIELDS.every((key) => Object.hasOwn(value, key)) ||
     !Object.values(value).every((field) => typeof field === "string") ||
     !FEEDBACK_CATEGORIES.includes(value.category) ||
-    (value.id !== undefined && !UUID_V4.test(value.id))
+    !UUID_V4.test(value.id)
   ) {
     return undefined;
   }

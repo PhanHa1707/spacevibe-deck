@@ -28,6 +28,12 @@ function renderForm(copy) {
     <form class="feedback-form" novalidate aria-labelledby="feedback-form-title">
       <p class="feedback-closed" data-closed-notice hidden data-copy="feedbackClosedNotice">${copy.feedbackClosedNotice}</p>
 
+      <div class="feedback-auth" data-feedback-auth hidden>
+        <p class="feedback-notice" data-auth-status role="status"></p>
+        <div data-google-signin></div>
+        <button type="button" class="feedback-pill feedback-pill--ghost feedback-pill--small" data-auth-signout hidden>Sign out</button>
+        <button type="button" class="feedback-pill feedback-pill--ghost feedback-pill--small" data-auth-retry hidden>Try sign-in again</button>
+      </div>
       <fieldset class="feedback-field">
         <legend class="feedback-label" data-copy="feedbackCategoryLabel">${copy.feedbackCategoryLabel}</legend>
         <div class="feedback-types">${renderTypes(copy)}</div>
@@ -71,8 +77,7 @@ function renderForm(copy) {
            which skips fields it cannot focus; the odd name, the unknown
            autocomplete token and the ignore attributes keep password managers
            off it too. A bot that fills every input still writes into it. The
-           Worker drops a filled one with a silent 204, so a false positive
-           here loses a real report without trace (DECK-101 review). -->
+           Worker rejects a filled field; it never reports a discarded report as saved. -->
       <label class="feedback-trap" aria-hidden="true">
         Leave empty
         <input
@@ -87,8 +92,10 @@ function renderForm(copy) {
       </label>
 
       <p class="feedback-notice" data-copy="feedbackNotice">${copy.feedbackNotice}</p>
+      <a class="feedback-notice" href="/privacy">Privacy notice</a>
       <p class="feedback-result" data-form-result role="status" aria-live="polite"></p>
 
+      <button type="button" class="feedback-pill feedback-pill--ghost feedback-pill--small" data-new-draft hidden>Use these edits in a new report</button>
       <div class="feedback-actions">
         <button class="feedback-pill feedback-submit" type="submit">
           <span data-submit-label data-copy="feedbackSubmit">${copy.feedbackSubmit}</span>
@@ -164,12 +171,20 @@ export function setComposerState(root, state, copyKey, copy) {
   }
 
   composer.dataset.state = state;
+  root.querySelector("[data-new-draft]").hidden = copyKey !== "feedbackErrorConflict";
   form.hidden = state === "sent";
   sent.hidden = state !== "sent";
-  submit.disabled = state === "sending";
+  submit.disabled =
+    state === "sending" ||
+    root.dataset.authReady !== "true" ||
+    composer.hasAttribute("data-closed");
 
   // Text typed while a send is in flight would be wiped by the reset that
   // follows success, so the fields hold still until the answer arrives.
+  for (const field of form.querySelectorAll('[name="category"]'))
+    field.disabled = state === "sending";
+  for (const field of form.querySelectorAll("[data-auth-signout]"))
+    field.disabled = state === "sending";
   for (const field of form.querySelectorAll('[name="title"], [name="body"]')) {
     field.readOnly = state === "sending";
   }
