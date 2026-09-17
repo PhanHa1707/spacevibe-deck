@@ -36,7 +36,8 @@ tomorrow (local-date skew). Closed days receive terminal 400 before any D1 write
 prevents stale retries from reinserting identifiers already removed by retention.
 
 204 means the D1 upsert completed. 400/413 are terminal, 429/503 retryable. Other routes
-return 404 and non-POST ingest returns 405. No read/export route exists. A shared
+return 404 and non-POST ingest returns 405. No route reads or exports usage data; the one
+read route, the feedback board below, never touches D1. A shared
 1000-request/minute, per-Cloudflare-location limiter bounds writes without reading IPs;
 it is best effort, not a strict global spending cap. Its namespace is service-specific.
 
@@ -49,8 +50,39 @@ The 03:00 UTC daily cron starts expiring rows at 34 days after first receipt, le
 day of margin inside the 35-day live-data target. D1 `batch` atomically groups coarse totals
 by schema/day/version/platform/architecture and deletes the raw rows. An error rejects the
 invocation and rolls back both operations. Aggregates contain no daily ID and remain internal;
-there is no public small-cell or dashboard surface. See [migration](migrations/0001-usage.sql) `current`
+no public surface shows usage data. See [migration](migrations/0001-usage.sql) `current`
 and [the update-counter column](migrations/0002-update-counters.sql).
+
+## Feedback
+
+The landing's `/feedback` page ([DECK-101](https://linear.app/mxrsv/issue/DECK-101)) talks to
+[`/v1/feedback`](src/feedback-routes.mjs), which keeps nothing in D1: Linear is the only store.
+`POST` [validates](src/feedback-payload.mjs) a title, body, category and optional draft UUID (up
+to 16 KB, so 2,000 characters fit in any script), drops a filled honeypot with a silent 204,
+applies its own `FEEDBACK_LIMITER`, then creates an issue in SpaceVibe-Deck with the `Feedback`
+label in **Backlog**. The visitor's text sits in a fenced block under `## User report`, with
+linear.app links defused so a paste cannot mention anyone; `Other` gets `Needs decision` instead
+of a Type label. The draft UUID becomes the issue id, so a resend after a lost answer finds the
+issue that already landed instead of creating a second one. `GET` returns the board — identifier,
+title, category, column and update time, never the description — edge-cached for 60 seconds per
+Cloudflare location. CORS allows only `deck.spacevibe.dev` and the local landing preview.
+
+Backlog is the moderation gate: nothing there is public. Moving an issue to Todo publishes its
+title, so rewrite a title in Linear before publishing it. The [board query](src/linear-feedback.mjs)
+asks Linear only for published state types and maps by type: unstarted → pending, started →
+review, completed → done (30 most recent). Every connection names its own `first`: Linear's
+complexity budget is per user and shared with every other tool using the key owner's account.
+
+With logging off, the `17 * * * *` [probe](src/linear-feedback.mjs) is the only signal that
+submissions fail: it rejects when the key, team, labels or Backlog state are missing or archived,
+so check that cron's invocations after any key or workflow change. The landing keeps sending
+closed (`SUBMISSIONS_OPEN` in [feedback-api.js](../marketing/landing-prototype/src/feedback-api.js))
+until the Worker ships; flip it only after a probe passes. Team, label and Backlog IDs are `vars`
+in [wrangler.jsonc](wrangler.jsonc); the key is a secret, and without it both routes answer 503:
+
+```sh
+npx wrangler secret put LINEAR_API_KEY
+```
 
 ## Operations and privacy
 
