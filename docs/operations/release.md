@@ -9,15 +9,21 @@ hand-run hotfix path for a build that already shipped. This page is the runbook 
 
 ## What a release is
 
-- **The trigger tag is `build/<release tag>`.** Two shapes are accepted:
-  `build/vX.Y.Z` (stable, the updater's default `latest` channel) and
-  `build/vX.Y.Z-electron.N` (prerelease, the `electron` channel).
+- **The trigger tag is `build/<release tag>`**, and only the stable shape `build/vX.Y.Z` is
+  accepted for now. Every build through 1.2.0 checks with `allowPrerelease` on and installs
+  the feed's newest entry, so a promoted `vX.Y.Z-electron.N` would move every stable install
+  onto the `electron` channel for good. The
+  [workflow](../../.github/workflows/electron-release.yml) refuses prerelease tags until the
+  installed base runs a build that resolves `releases/latest`.
 - **The release tag is the trigger tag without the `build/` prefix**, and it does not exist
   until the run has finished. GitHub creates it when the draft is promoted. Pushing a bare
   `vX.Y.Z` tag would advertise the version through `releases.atom` ten minutes before its
   manifests existed, and every running app that checked in that window would report a
-  failed update check. `build/v…` is not valid semver, so a prerelease client skips it,
-  and a stable client never reads the feed's tag list — it resolves `releases/latest`.
+  failed update check. `build/v…` is not valid semver, so a prerelease client skips it, and
+  a stable build after 1.2.0 never reads the feed's tag list — it resolves
+  [`releases/latest`](../../electron/updater/updater.ts). Builds through 1.2.0 still read it
+  and take its first entry, so while a run is in flight they ask the trigger tag for
+  manifests, get a 404, and hide the failed check. Keep that window short.
 - **The tagged commit must be reachable from `origin/main`**, and the tag must equal
   `v<version>` for the `version` in [`package.json`](../../package.json). Either mismatch
   fails the run before anything is built.
@@ -134,6 +140,9 @@ A retry depends on both the failed step and whether the source must change:
 - **Same commit, draft exists and `prepare` succeeded:** rerun the failed platform or
   `promote` jobs. Keep the draft so successful platform assets remain available. Do not
   rerun successful `prepare`: its create-draft step would collide with the existing draft.
+  While the draft waits, the trigger tag stays the feed's newest entry and every build
+  through 1.2.0 fails its update check against it, so do not leave it waiting: finish the
+  rerun promptly, or remove the attempt with the guarded procedure below and tag again later.
 - **Source must change:** failed-job reruns still use the original SHA. Complete the
   corrected source and CI first, then remove the failed attempt and recreate the trigger
   tag using the guarded procedure below.
