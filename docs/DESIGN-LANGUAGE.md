@@ -3413,11 +3413,6 @@ Numbered 34 because §33 was the previous highest rule.
   card ever wears, and on it the state word fell under DL-3.5's floor in three
   of six cells (dark `FAILED` 4.32, light `FAILED` 4.30, light `ASKED` 3.43).
   Inside a selected card the word therefore takes a **second ink** —
-  **Amended 2026-09-15 (DECK-118):** DL-34.11's group headers wear
-  `.board-label` too — the same class, so DL-4.3's exception still names one
-  selector — and head their groups at `--type-meta`, the Board-scoped
-  exception DL-4.3's group-label clause already makes for `STATUS` and
-  `PROJECTS`.
   `--board-state-failed-ink` / `--board-state-asked-ink` /
   `--board-state-neutral-ink`, each the resting ink mixed 70% toward `--fg`,
   which lightens on a dark theme and darkens on a light one with no branch.
@@ -3430,6 +3425,11 @@ Numbered 34 because §33 was the previous highest rule.
   exception) for the two nav headings and the state word; `--text-primary`
   for names and values, `--text-muted` for the task or tail, `--text-faint`
   for labels, the where-line, meta and the number.
+  **Amended 2026-09-15 (DECK-118):** DL-34.11's group headers wear
+  `.board-label` too — the same class, so DL-4.3's exception still names one
+  selector — and head their groups at `--type-meta`, the Board-scoped
+  exception DL-4.3's group-label clause already makes for `STATUS` and
+  `PROJECTS`.
 - **DL-34.6** **RETIRED 2026-09-09 (DECK-43) — the panel is unmounted.**
   [`AgentBoardPanel`](../src/ui/agent-board-panel.tsx) `deprecated` still
   builds and keeps its suite; nothing renders it, so this rule and DL-34.7
@@ -3460,6 +3460,18 @@ Numbered 34 because §33 was the previous highest rule.
   first press to absorb, so the branch is deleted rather than left unreachable.
 - **DL-34.10** **Stop leaves the shell and the card; Restart resumes the
   conversation and exists only once the agent has left; Close lives in
+  `More`.** The hover column carries at most Stop-or-Restart, `Open in
+  stage` and `More`; `More` carries all four rows. **Amended 2026-09-04, from
+  the eye pass, twice.** `More` carries **every row the card's state admits**
+  — three, not four: Stop and Restart are mutually exclusive by state, and a
+  disabled fourth row would name an act the card forbids. And the hover
+  column is **out of the Tab order**: at three buttons a card it put 27 stops
+  between the grid and the panel, so the keyboard reaches the actions through
+  `More` alone, opened on the card with the context-menu key (Shift+F10),
+  with Escape returning focus to the card rather than to `<body>`. The
+  column also reserves its own track on the card's first row — an
+  `opacity: 0` overlay drew over the rank digit, which is the handle the
+  digit keys use.
 - **DL-34.11** **One short bar above the grid filters and re-lays the Board,
   and it carries only the controls used often (2026-09-15, DECK-118).** Left:
   `All` and `Needs me` (`asked` + `failed`), each with its count over every
@@ -3479,18 +3491,6 @@ Numbered 34 because §33 was the previous highest rule.
   Board-local and reset when the chip closes. See the
   [bar](../src/ui/agent-board-bar.tsx) and the
   [list rules](../src/styles/19-agent-board.css).
-  `More`.** The hover column carries at most Stop-or-Restart, `Open in
-  stage` and `More`; `More` carries all four rows. **Amended 2026-09-04, from
-  the eye pass, twice.** `More` carries **every row the card's state admits**
-  — three, not four: Stop and Restart are mutually exclusive by state, and a
-  disabled fourth row would name an act the card forbids. And the hover
-  column is **out of the Tab order**: at three buttons a card it put 27 stops
-  between the grid and the panel, so the keyboard reaches the actions through
-  `More` alone, opened on the card with the context-menu key (Shift+F10),
-  with Escape returning focus to the card rather than to `<body>`. The
-  column also reserves its own track on the card's first row — an
-  `opacity: 0` overlay drew over the rank digit, which is the handle the
-  digit keys use.
 
 ## Chưa khớp thực tế
 
