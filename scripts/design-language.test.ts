@@ -377,7 +377,7 @@ describe("DL-33 recent agent activity", () => {
     const rulebook = readFileSync(RULEBOOK, "utf8");
     const css = readStylesheet().replace(CSS_COMMENT, "");
 
-    expect(rulebook).toContain("## 33. Recent agent activity");
+    expect(rulebook).toContain("## 33. Sidebar usage and retained activity rows");
     for (const rule of ["33.1", "33.2", "33.3", "33.4", "33.5"]) {
       expect(rulebook).toContain(`**DL-${rule}**`);
     }

@@ -43,13 +43,13 @@ describe.skipIf(process.platform === "win32")("Codex account RPC reader", () => 
       rateLimits: { primary: { usedPercent: 82 } },
     });
     const pid = Number(await fs.readFile(path.join(root, "pid"), "utf8"));
-    expect(() => process.kill(pid, 0)).toThrow();
+    expect(() => process.kill(pid, 0)).toThrow(/ESRCH/);
   });
   it("times out an unresponsive CLI and stops it", async () => {
     const executable = await server("");
     await expect(readCodexRateLimits(executable, undefined, 1000)).rejects.toThrow("timed out");
     const pid = Number(await fs.readFile(path.join(root, "pid"), "utf8"));
-    expect(() => process.kill(pid, 0)).toThrow();
+    expect(() => process.kill(pid, 0)).toThrow(/ESRCH/);
   });
   it("rejects malformed protocol data rather than displaying a guessed limit", async () => {
     const executable = await server(`process.stdout.write('not-json\\n');`);

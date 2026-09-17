@@ -114,7 +114,7 @@ describe.skipIf(process.platform === "win32")("Claude status-line collector", ()
   });
   it("refuses malformed settings without overwriting them", async () => {
     await fs.writeFile(options().settingsPath, "broken json");
-    await expect(installClaudeLimitCollector(options())).rejects.toThrow();
+    await expect(installClaudeLimitCollector(options())).rejects.toThrow(SyntaxError);
     expect(await fs.readFile(options().settingsPath, "utf8")).toBe("broken json");
   });
   it("preserves status-line option edits across reinstall and restore", async () => {
