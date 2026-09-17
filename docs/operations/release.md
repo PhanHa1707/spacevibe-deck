@@ -7,6 +7,10 @@ One pushed tag ships SpaceVibe Deck for macOS and Windows, both self-updating, t
 Tauri host automatically any more; [`release.yml`](../../.github/workflows/release.yml) is a
 hand-run hotfix path for a build that already shipped. This page is the runbook for both.
 
+Manual native acceptance, real-device upgrade checks, and Windows install/update checks run
+only when explicitly requested. They do not block release completion or issue closure.
+Report the checks actually performed; omitted checks are not successful test results.
+
 ## What a release is
 
 - **The trigger tag is `build/<release tag>`**, and only the stable shape `build/vX.Y.Z` is
@@ -291,8 +295,8 @@ To rebuild a Tauri hotfix:
 3. Beyond the Apple secrets above it needs `TAURI_SIGNING_PRIVATE_KEY` and
    `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 
-A future hotfix containing the notice needs a separate release decision, a native Tauri
-banner check, and a verified delivery path to installed users. Rebuilding the old `v0.12.3`
+A future hotfix containing the notice needs a separate release decision and a delivery path
+to installed users. Rebuilding the old `v0.12.3`
 tag cannot add a later commit. Building a newer tag with `MIGRATION_NOTICE_ENABLED = true`
 also does not by itself restore the broken updater endpoint or deliver the banner to users.
 

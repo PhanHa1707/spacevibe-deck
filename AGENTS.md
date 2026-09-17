@@ -15,14 +15,14 @@ documentation index is [docs/README.md](docs/README.md).
 ## Current direction
 
 - **Auto-update is a core requirement.** A release is not complete if distribution falls back
-  to manual download. Release claims need platform-specific runtime evidence; see
-  [operations/release.md](docs/operations/release.md).
+  to manual download. Release artifacts include the updater payloads and manifests described
+  in [operations/release.md](docs/operations/release.md).
 - **Tauri is feature-frozen.** New product features land on Electron so they are not
   implemented twice. A renderer change reaches both hosts; a change needing a new host command
   is Electron-only and degrades on Tauri through an `available` flag, never a second
   implementation. Say which host a change runs on rather than implying both.
-- **Windows has no owner-verified native pass.** It ships unsigned by decision. Green unit and
-  build checks are not evidence there.
+- **Windows ships unsigned by decision.** See the
+  [platform limits](docs/operations/release.md#platform-limits).
 - **Analytics is mandatory** — always on, no opt-out, and the disclosure stays. The contract is
   [internals/telemetry.md](docs/internals/telemetry.md); the receiving service is
   [backend/](backend/README.md).
@@ -54,7 +54,7 @@ Stop and ask before writing code when a task touches:
   or close/quit coordination, on either host;
 - bundle, dependency, signing, release channel, updater or version configuration;
 - a rule in [docs/DESIGN-LANGUAGE.md](docs/DESIGN-LANGUAGE.md);
-- Electron/Tauri cutover scope, or a platform claim with no matching hardware evidence;
+- Electron/Tauri cutover scope;
 - any sibling repo.
 
 Not a fork: internal renames, tests, styling within current DL rules, and editing the menu
@@ -82,6 +82,9 @@ turned down and why — a fork nobody can reconstruct is a decision that will be
 | `npm run video:render`        | render marketing video from DOM stage                                                                                                                                   |
 
 Standing rule in this repo: gates run only when asked. A change reported without them says so.
+Manual native acceptance, real-device upgrade checks, and Windows install/update checks run
+only when explicitly requested; they are not prerequisites for release completion or issue
+closure. Report checks actually performed without treating omitted checks as successful.
 
 ## Layout
 
