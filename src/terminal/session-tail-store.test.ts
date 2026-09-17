@@ -142,7 +142,7 @@ describe("session tail store", () => {
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
 
     expect(hosts.sessionTails).toHaveBeenCalledTimes(1);
-    expect(batchAt(0)).toEqual([{ agent: "claude", cwd: "/w", lastSeenAt: NOW }]);
+    expect(batchAt(0)).toEqual([{ agent: "claude", cwd: "/w", lastSeenAt: NOW, notBefore: NOW }]);
     expect(paneTails.value.get(101)).toBe("writing the tests");
   });
 
@@ -174,7 +174,7 @@ describe("session tail store", () => {
     // The second ask carries the pairing the first ask reported, so the answer
     // cannot drift onto a different session just because the clock moved.
     expect(batchAt(1)).toEqual([
-      { agent: "claude", cwd: "/w", lastSeenAt: NOW + 5_000, preferredId: "s1" },
+      { agent: "claude", cwd: "/w", lastSeenAt: NOW + 5_000, preferredId: "s1", notBefore: NOW },
     ]);
     expect(paneTails.value.get(101)).toBe("second");
   });
@@ -203,7 +203,7 @@ describe("session tail store", () => {
     dispose = installSessionTailSync();
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
 
-    expect(batchAt(0)).toEqual([{ agent: "claude", cwd: "/w", lastSeenAt: NOW }]);
+    expect(batchAt(0)).toEqual([{ agent: "claude", cwd: "/w", lastSeenAt: NOW, notBefore: NOW }]);
     expect([...paneTails.value.keys()]).toEqual([101]);
   });
 
@@ -218,9 +218,9 @@ describe("session tail store", () => {
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
 
     expect(batchAt(0)).toEqual([
-      { agent: "claude", cwd: "/a", lastSeenAt: NOW },
-      { agent: "codex", cwd: "/a", lastSeenAt: NOW },
-      { agent: "gemini", cwd: "/b", lastSeenAt: NOW },
+      { agent: "claude", cwd: "/a", lastSeenAt: NOW, notBefore: NOW },
+      { agent: "codex", cwd: "/a", lastSeenAt: NOW, notBefore: NOW },
+      { agent: "gemini", cwd: "/b", lastSeenAt: NOW, notBefore: NOW },
     ]);
     expect([...paneTails.value.entries()]).toEqual([
       [101, "one"],
@@ -449,6 +449,102 @@ describe("session tail store", () => {
  * are the reproductions: each asserts the behaviour the review says is MISSING,
  * so a red test here is the defect confirmed and a green one refutes it.
  */
+describe("session tail store — the fresh-pane floor", () => {
+  let dispose: (() => void) | null = null;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    resetSessionTailStore();
+    tabViews.value = [];
+    hosts.available = true;
+    hosts.sessionTails.mockReset();
+    hosts.sessionTails.mockResolvedValue(tails());
+  });
+
+  afterEach(() => {
+    dispose?.();
+    dispose = null;
+    resetSessionTailStore();
+    tabViews.value = [];
+    vi.useRealTimers();
+  });
+
+  it("F1. a fresh pane that trips hasRun carries the moment its agent was first seen", async () => {
+    // A Codex startup paint reads as `working` to the output heuristic
+    // (2026-09-17), so `hasRun` can flip with no prompt sent. The floor is
+    // what keeps the ranking from answering with an older conversation in
+    // the same directory: it is the store's own first sight of this agent
+    // generation, taken while the pane was still skipped as never-run.
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex", hasRun: false })])];
+    dispose = installSessionTailSync();
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    expect(hosts.sessionTails).not.toHaveBeenCalled();
+
+    vi.setSystemTime(NOW + 4_000);
+    tabViews.value = [
+      tab(1, "/w", [pane(101, { agent: "codex", hasRun: true, changedAt: NOW + 4_000 })]),
+    ];
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+
+    expect(batchAt(0)).toEqual([
+      { agent: "codex", cwd: "/w", lastSeenAt: NOW + 4_000, notBefore: NOW },
+    ]);
+  });
+
+  it("F2. a resumed pane sends no floor — its conversation predates it by design", async () => {
+    noteResumedPane("/w", "codex");
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex", hasRun: false })])];
+    hosts.sessionTails.mockResolvedValue(tails("what it said before the quit"));
+
+    dispose = installSessionTailSync();
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+
+    expect(batchAt(0)).toEqual([{ agent: "codex", cwd: "/w", lastSeenAt: NOW }]);
+    // And it stays unfloored on every later ask: the mark pins the pane for life.
+    tabViews.value = [
+      tab(1, "/w", [pane(101, { agent: "codex", hasRun: true, changedAt: NOW + 9_000 })]),
+    ];
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    expect(batchAt(1)).toEqual([
+      { agent: "codex", cwd: "/w", lastSeenAt: NOW + 9_000, preferredId: "s1" },
+    ]);
+  });
+
+  it("F3. a relaunch in the same pane moves the floor to the new generation", async () => {
+    // codex → shell → codex. `PaneView.startedAt` survives that round trip for
+    // Board uptime, which is exactly why the floor is NOT read from it: the
+    // second codex would inherit the first one's floor and the first one's
+    // conversation would pass it.
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex" })])];
+    hosts.sessionTails.mockResolvedValue(tails("first launch"));
+    dispose = installSessionTailSync();
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    expect(batchAt(0)[0].notBefore).toBe(NOW);
+
+    vi.setSystemTime(NOW + 10_000);
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: null, changedAt: NOW + 10_000 })])];
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+
+    vi.setSystemTime(NOW + 20_000);
+    tabViews.value = [
+      tab(1, "/w", [pane(101, { agent: "codex", hasRun: false, changedAt: NOW + 20_000 })]),
+    ];
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+
+    vi.setSystemTime(NOW + 25_000);
+    tabViews.value = [
+      tab(1, "/w", [pane(101, { agent: "codex", hasRun: true, changedAt: NOW + 25_000 })]),
+    ];
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+
+    expect(hosts.sessionTails).toHaveBeenCalledTimes(2);
+    expect(batchAt(1)).toEqual([
+      { agent: "codex", cwd: "/w", lastSeenAt: NOW + 25_000, notBefore: NOW + 20_000 },
+    ]);
+  });
+});
+
 describe("session tail store — pairing hazards", () => {
   let dispose: (() => void) | null = null;
 

@@ -253,6 +253,18 @@ function livePaneIds(tabs: readonly TabView[]): Set<number> {
 interface PaneGeneration {
   readonly agent: string | null;
   readonly ran: boolean;
+  /**
+   * When this store FIRST saw this generation — the fresh-pane floor sent as
+   * `notBefore` (DECK-119, 2026-09-17). A pane that did not resume anything
+   * started a new conversation, and a session written before the pane's
+   * agent appeared cannot be that conversation, however close its mtime
+   * sits to the pane's clock. Kept here rather than read off
+   * `PaneView.startedAt`, which the tab layer deliberately carries across
+   * shell → same-agent for Board uptime: a relaunched codex would inherit
+   * the first launch's floor, and the first launch's conversation would
+   * pass it.
+   */
+  readonly seenAt: number;
 }
 
 const paneGenerations = new Map<number, PaneGeneration>();
@@ -324,6 +336,12 @@ function entriesOf(tabs: readonly TabView[]): readonly TailEntry[] {
         continue;
       }
       const preferredId = fact ?? paneSessions.get(pane.paneId);
+      // The floor under the ranking: a pane that did NOT resume anything is
+      // in a conversation no older than this store's first sight of its
+      // agent. `prune` has already run for this snapshot, so the generation
+      // record is current. A resumed pane's conversation predates it by
+      // design and is sent without one.
+      const notBefore = resumed ? undefined : paneGenerations.get(pane.paneId)?.seenAt;
       entries.push({
         paneId: pane.paneId,
         request: {
@@ -334,6 +352,7 @@ function entriesOf(tabs: readonly TabView[]): readonly TailEntry[] {
           // keeps the answer stable instead of re-guessed every few seconds.
           ...(preferredId === undefined ? {} : { preferredId }),
           ...(fact === null ? {} : { exact: true }),
+          ...(notBefore === undefined ? {} : { notBefore }),
         },
       });
     }
@@ -460,6 +479,7 @@ function prune(
   current: PaneSessionMaps,
   tabs: readonly TabView[],
   live: Set<number>,
+  now: number,
 ): PaneSessionMaps {
   const tails = new Map(current.tails);
   const models = new Map(current.models);
@@ -477,7 +497,9 @@ function prune(
   }
   for (const tab of tabs) {
     for (const pane of panesOf(tab)) {
-      if (isNewGeneration(pane, paneGenerations.get(pane.paneId))) {
+      const previous = paneGenerations.get(pane.paneId);
+      const replaced = isNewGeneration(pane, previous);
+      if (replaced) {
         // Keep the id ONLY when the generation ends with no agent — spec
         // §11.11's own words. `isNewGeneration` is true for four transitions,
         // not one: agent→shell (keep), shell→agent, agentA→agentB, and
@@ -490,7 +512,14 @@ function prune(
         // generation", through `forget`'s own delete branch.
         forget(tails, models, pane.paneId, liveAgentOf(pane) === null);
       }
-      paneGenerations.set(pane.paneId, { agent: liveAgentOf(pane), ran: pane.hasRun });
+      // The floor moves only when the occupant does: first sight of the pane,
+      // or a generation change. A pane merely doing something (`ran` going
+      // true) keeps the floor its agent started under. The tracker stamps
+      // `changedAt` at the gate open that IS the generation change, which is
+      // closer to the agent's real start than this debounced batch; the
+      // batch clock is only the fallback for a pane that has never changed.
+      const seenAt = previous === undefined || replaced ? pane.changedAt || now : previous.seenAt;
+      paneGenerations.set(pane.paneId, { agent: liveAgentOf(pane), ran: pane.hasRun, seenAt });
     }
   }
   return { tails, models };
@@ -522,6 +551,7 @@ async function run(): Promise<void> {
       { tails: paneTails.value, models: paneModels.value },
       tabs,
       livePaneIds(tabs),
+      Date.now(),
     );
     // `prune` only ever deletes, so a size match on EITHER map is a "nothing
     // changed" proof for that map. Checked and published SEPARATELY because a

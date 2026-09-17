@@ -37,6 +37,18 @@ export interface ResumeRequest {
    * tail path for a registry-confirmed pane.
    */
   readonly exact?: boolean;
+  /**
+   * A floor under the ranking: no candidate whose mtime predates it can be
+   * this pane's conversation (DECK-119, 2026-09-17). The tail store sends
+   * the moment it first saw the pane's current agent generation, for a pane
+   * that did NOT resume an existing session. A Codex startup paint reads as
+   * `working` to the output heuristic, so a never-prompted pane used to be
+   * ranked and handed the nearest older rollout in the same directory.
+   *
+   * Only `selectCandidate` reads it; a pin (`findCandidateById`) is the
+   * answer the ranking guesses at and is not floored. Never sent by restore.
+   */
+  readonly notBefore?: number;
 }
 
 export type ResumeRef =
@@ -115,11 +127,18 @@ export function selectCandidate(
   matchesCwd: (request: ResumeRequest, candidate: CandidateSession) => boolean = cwdMatches,
 ): CandidateSession | null {
   const cutoffMs = request.lastSeenAt - THIRTY_DAYS_MS;
+  // The fresh-pane floor. Only the newest write counts, so a pane's OWN
+  // session written a beat before the store first saw the pane is not lost:
+  // its next turn moves the mtime past the floor and the ranking finds it.
+  const floorMs = request.notBefore ?? Number.NEGATIVE_INFINITY;
   // Filter first, sort the copy: sorting the scan result in place would
   // reorder the per-call cache every other request reads (C1).
   const eligible = candidates.filter(
     (candidate) =>
-      candidate.mtimeMs >= cutoffMs && !taken.has(candidate.id) && matchesCwd(request, candidate),
+      candidate.mtimeMs >= cutoffMs &&
+      candidate.mtimeMs >= floorMs &&
+      !taken.has(candidate.id) &&
+      matchesCwd(request, candidate),
   );
   eligible.sort(
     (left, right) =>
@@ -296,12 +315,21 @@ export function validateResumeRequests(raw: unknown): (ResumeRequest | null)[] {
     const preferredId = isSafeSessionId(entry.preferredId) ? entry.preferredId : undefined;
     // `exact` without a pin is meaningless and is dropped with it.
     const exact = preferredId !== undefined && entry.exact === true;
+    // A malformed floor is dropped the way a malformed pin is: the request
+    // still ranks, it just ranks without the floor.
+    const notBefore =
+      typeof entry.notBefore === "number" &&
+      Number.isFinite(entry.notBefore) &&
+      entry.notBefore >= 0
+        ? entry.notBefore
+        : undefined;
     return {
       agent: entry.agent,
       cwd: entry.cwd,
       lastSeenAt: entry.lastSeenAt,
       ...(preferredId === undefined ? {} : { preferredId }),
       ...(exact ? { exact } : {}),
+      ...(notBefore === undefined ? {} : { notBefore }),
     };
   });
 }

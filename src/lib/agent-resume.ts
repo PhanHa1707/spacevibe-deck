@@ -29,6 +29,15 @@ export interface ResumeRequest {
    * rank a substitute (spec §10.7). Only the tail path sends it.
    */
   readonly exact?: boolean;
+  /**
+   * Epoch ms before which no candidate can be this pane's conversation: the
+   * moment the tail store first saw the pane's current agent generation. A
+   * pane that started a NEW conversation cannot be running one written
+   * before it existed, so the ranking drops those (DECK-119). Absent for a
+   * pane that resumed an existing conversation, whose session predates it
+   * by design. Only the tail path sends it.
+   */
+  readonly notBefore?: number;
 }
 
 /** Wire mirror of `electron/resume/session-tail.ts`'s `SessionTailAnswer`. */

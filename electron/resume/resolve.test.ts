@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { resolveResume, validateResumeRequests } from "./resolve";
+import { resolveResume, selectCandidate, validateResumeRequests } from "./resolve";
 import {
   CLAUDE_DIR,
   CLAUDE_PROJECTS_DIR,
@@ -374,6 +374,22 @@ describe("validateResumeRequests", () => {
     ]);
   });
 
+  it("(o) carries a finite `notBefore` and drops a malformed one without rejecting the request", () => {
+    expect(
+      validateResumeRequests([
+        { agent: "codex", cwd: "/tmp/w", lastSeenAt: 1, notBefore: 5 },
+        { agent: "codex", cwd: "/tmp/w", lastSeenAt: 2, notBefore: "soon" },
+        { agent: "codex", cwd: "/tmp/w", lastSeenAt: 3, notBefore: Number.NaN },
+        { agent: "codex", cwd: "/tmp/w", lastSeenAt: 4, notBefore: -1 },
+      ]),
+    ).toEqual([
+      { agent: "codex", cwd: "/tmp/w", lastSeenAt: 1, notBefore: 5 },
+      { agent: "codex", cwd: "/tmp/w", lastSeenAt: 2 },
+      { agent: "codex", cwd: "/tmp/w", lastSeenAt: 3 },
+      { agent: "codex", cwd: "/tmp/w", lastSeenAt: 4 },
+    ]);
+  });
+
   it("(n) carries `exact` only beside a pin (stage 1, 2026-09-03)", () => {
     expect(
       validateResumeRequests([
@@ -386,5 +402,48 @@ describe("validateResumeRequests", () => {
       { agent: "claude", cwd: "/tmp/w", lastSeenAt: 2, preferredId: "s1" },
       { agent: "claude", cwd: "/tmp/w", lastSeenAt: 3 },
     ]);
+  });
+});
+
+describe("selectCandidate — the fresh-pane floor (DECK-119)", () => {
+  const cwd = "/tmp/w";
+  const older = { id: "older", cwd, mtimeMs: T1 };
+  const newer = { id: "newer", cwd, mtimeMs: T1 + 60_000 };
+  // The pane's clock sits 1 s after `older`: by distance alone, `older` wins.
+  const lastSeenAt = T1 + 1_000;
+
+  it("ranks by distance when no floor is sent", () => {
+    expect(selectCandidate({ agent: "codex", cwd, lastSeenAt }, [older, newer], new Set())).toBe(
+      older,
+    );
+  });
+
+  it("excludes a cwd-matching candidate written before the floor, even the closest one", () => {
+    // A fresh pane's own conversation cannot have been written before the
+    // pane's agent appeared; `older` here is the previous session in the same
+    // directory that a startup paint used to hand to a never-prompted pane.
+    expect(
+      selectCandidate(
+        { agent: "codex", cwd, lastSeenAt, notBefore: T1 + 500 },
+        [older, newer],
+        new Set(),
+      ),
+    ).toBe(newer);
+  });
+
+  it("answers null when every candidate predates the floor", () => {
+    expect(
+      selectCandidate(
+        { agent: "codex", cwd, lastSeenAt, notBefore: T1 + 120_000 },
+        [older, newer],
+        new Set(),
+      ),
+    ).toBeNull();
+  });
+
+  it("keeps a candidate written exactly at the floor", () => {
+    expect(
+      selectCandidate({ agent: "codex", cwd, lastSeenAt, notBefore: T1 }, [older], new Set()),
+    ).toBe(older);
   });
 });
