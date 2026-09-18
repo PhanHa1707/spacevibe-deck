@@ -26,6 +26,7 @@ export interface AttentionOverlaySnapshot {
 
 /** Input to {@link runAttentionFocus}. */
 export interface AttentionFocusRequest {
+  readonly dismissAgentLauncher?: () => void;
   /** `undefined` = global (shortcut); a number = scoped (status click). */
   tabIndex?: number;
   /** Precomputed by the caller, e.g. `tabsRef.hasActionableAttention(tabIndex)`. */
@@ -74,6 +75,7 @@ export function runAttentionFocus(req: AttentionFocusRequest): void {
     return; // draft in flight — blocked, no dismissal, no focus
   }
 
+  req.dismissAgentLauncher?.();
   if (overlays.board) {
     dismissBoard();
   }

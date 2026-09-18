@@ -81,19 +81,18 @@ export const THEME_PRESETS: ThemePreset[] = [
     id: DECK_DARK_ID,
     label: "Dark",
     theme: {
-      // `PINNED_SIDEBAR_BG` in `derive-colors.ts` is keyed on this exact value
-      // (2026-08-19): editing it here without editing the pin there retires
-      // the owner's `#161b22` sidebar silently, back to a derived lift.
-      background: "#17181c",
+      // DL-2.2: the neutral-black stage is deepest; its pinned #141414 sidebar
+      // in `derive-colors.ts` anchors the brighter chrome layers.
+      background: "#0a0a0a",
       // DL-3.6, applied at birth rather than retrofitted: the reviewed seed
       // was `#e5e7eb`, a faintly blue ink, and `deriveChromeColors` builds the
       // whole chrome text ladder out of `foreground` — so that tint would have
       // reached every label in the app. `#e7e7e7` is the gray of matching WCAG
-      // luminance (14.33:1 → 14.35:1 against this background), so only the hue
-      // is gone. The ANSI sixteen below keep the palette's own colour.
+      // luminance against the original background. The ANSI sixteen below
+      // keep the palette's own colour.
       foreground: "#e7e7e7",
       cursor: "#e7e7e7",
-      selectionBackground: "#343842",
+      selectionBackground: "#303030",
       black: "#202228",
       red: "#ef6b73",
       green: "#8ccf7e",

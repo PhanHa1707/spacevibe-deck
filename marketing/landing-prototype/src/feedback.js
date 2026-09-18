@@ -1,3 +1,4 @@
+import { createFeedbackAuth } from "./feedback-auth.js";
 import "../styles/tokens.css";
 import "../styles/frame.css";
 import "../styles/changelog.css";
@@ -7,6 +8,9 @@ import "../styles/feedback-board.css";
 import { messages } from "./copy.js";
 import {
   BODY_MAX,
+  FEEDBACK_BOARD_OPEN,
+  FEEDBACK_STATUSES,
+  fetchFeedbackConfig,
   FeedbackSubmitError,
   SUBMISSIONS_OPEN,
   TITLE_MAX,
@@ -38,12 +42,19 @@ const SUBMIT_ERROR_COPY = {
   invalid: "feedbackErrorInvalid",
   rate: "feedbackErrorRate",
   server: "feedbackErrorServer",
+  auth: "feedbackErrorAuth",
+  conflict: "feedbackErrorConflict",
 };
 
 // Review-only switch, live under `npm run prototype:landing` alone: `?demo`
 // swaps the Worker for fixtures (see feedback-demo.js).
 const params = new URLSearchParams(window.location.search);
-const submissionsOpen = SUBMISSIONS_OPEN || (import.meta.env.DEV && params.has("demo"));
+const demo = import.meta.env.DEV && params.has("demo");
+let submissionsOpen = false;
+let auth = null;
+let nextCursor = null;
+let loadingBoard = false;
+let loadedBoard = Object.fromEntries(FEEDBACK_STATUSES.map((status) => [status, []]));
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.userAgent);
 const storage = safeLocalStorage();
 
@@ -72,20 +83,35 @@ if (!form || !shortcut) {
 
 shortcut.textContent = IS_MAC ? "⌘ ↵" : "Ctrl ↵";
 
-async function loadBoard() {
+async function loadBoard(cursor = null) {
+  if (loadingBoard) return;
+  loadingBoard = true;
   const currentRequest = ++requestId;
-  renderBoardLoading(root, messages[locale]);
-
+  const more = root.querySelector("[data-board-more]");
+  const pageStatus = root.querySelector("[data-page-status]");
+  more.disabled = true;
+  pageStatus.textContent = "";
+  if (!cursor) renderBoardLoading(root, messages[locale]);
   try {
-    const board = await api.fetchBoard();
-
+    const page = await api.fetchBoard(cursor);
     if (currentRequest === requestId) {
-      renderBoard(root, board, messages[locale], locale);
+      loadedBoard = Object.fromEntries(
+        FEEDBACK_STATUSES.map((status) => {
+          const existing = cursor ? loadedBoard[status] : [];
+          const ids = new Set(existing.map((item) => item.id));
+          return [status, [...existing, ...page.board[status].filter((item) => !ids.has(item.id))]];
+        }),
+      );
+      nextCursor = page.nextCursor;
+      renderBoard(root, loadedBoard, messages[locale], locale);
+      more.hidden = !nextCursor;
     }
   } catch {
-    if (currentRequest === requestId) {
-      renderBoardError(root, messages[locale]);
-    }
+    if (cursor) pageStatus.textContent = "Could not load older feedback. Try again.";
+    else renderBoardError(root, messages[locale]);
+  } finally {
+    more.disabled = false;
+    loadingBoard = false;
   }
 }
 
@@ -117,13 +143,14 @@ function saveDraft() {
 async function handleSubmit() {
   // Cmd/Ctrl+Enter calls requestSubmit(), which a disabled button cannot stop:
   // without this guard a double press sends the same report twice.
-  if (!submissionsOpen || sending) {
+  if (!submissionsOpen || sending || (!demo && !auth?.token())) {
     return;
   }
 
   const input = readForm();
 
   if (
+    !input.id ||
     input.title.length < TITLE_MIN ||
     input.title.length > TITLE_MAX ||
     input.body.length > BODY_MAX
@@ -133,11 +160,13 @@ async function handleSubmit() {
     return;
   }
 
+  // FormData omits disabled radios, so save before locking the fields.
+  saveDraft();
   sending = true;
   setComposerState(root, "sending", null, messages[locale]);
 
   try {
-    await api.submit(input);
+    await api.submit({ ...input, credential: auth?.token() });
     form.reset();
     clearDraft(storage);
     draftId = newDraftId();
@@ -147,6 +176,7 @@ async function handleSubmit() {
     root.querySelector("[data-send-another]")?.focus();
   } catch (error) {
     const reason = error instanceof FeedbackSubmitError ? error.reason : "server";
+    if (reason === "auth") auth?.reset();
     setComposerState(root, "error", SUBMIT_ERROR_COPY[reason], messages[locale]);
   } finally {
     sending = false;
@@ -200,11 +230,18 @@ root.addEventListener("click", (event) => {
 
   if (localeButton) {
     switchLocale(localeButton.dataset.locale);
+  } else if (target.closest("[data-new-draft]")) {
+    draftId = newDraftId();
+    saveDraft();
+    setComposerState(root, "idle", null, messages[locale]);
+    root.querySelector(".feedback-submit")?.focus();
   } else if (target.closest("[data-send-another]")) {
     resetComposer(root, messages[locale]);
     form.querySelector('[name="title"]')?.focus();
   } else if (tab) {
     selectBoardColumn(root, tab.dataset.tab);
+  } else if (target.closest("button[data-board-more]")) {
+    void loadBoard(nextCursor);
   } else if (target.closest("button[data-board-retry]")) {
     void loadBoard();
   }
@@ -221,18 +258,34 @@ async function start() {
 
   updateFormMeters(form);
 
-  // Closed: no board to fetch and nothing to send — the Worker is not live.
-  if (!submissionsOpen) {
+  // Before the first backend rollout, keep the existing local-only holding mode.
+  if (!SUBMISSIONS_OPEN && !FEEDBACK_BOARD_OPEN && !demo) {
     setComposerClosed(root, messages[locale]);
     renderBoardClosed(root, messages[locale]);
     return;
   }
-
-  if (import.meta.env.DEV && params.has("demo")) {
+  if (demo) {
     const { createDemoFeedbackApi } = await import("./feedback-demo.js");
     api = createDemoFeedbackApi(params.get("demo"));
+    submissionsOpen = true;
+    root.dataset.authReady = "true";
+  } else {
+    root.dataset.authReady = "false";
+    setComposerState(root, "idle", null, messages[locale]);
+    try {
+      const config = await fetchFeedbackConfig();
+      submissionsOpen = SUBMISSIONS_OPEN && config.submissionsOpen;
+      if (submissionsOpen && config.googleClientId) {
+        auth = createFeedbackAuth(root, config.googleClientId, (ready) => {
+          root.dataset.authReady = String(ready);
+          if (!sending) setComposerState(root, "idle", null, messages[locale]);
+        });
+      } else setComposerClosed(root, messages[locale]);
+    } catch {
+      setComposerClosed(root, messages[locale]);
+    }
   }
-
+  // Public reads do not depend on Google sign-in or the intake switch.
   await loadBoard();
 }
 

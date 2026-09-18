@@ -156,6 +156,8 @@ export interface FileSurfaceController extends SurfaceStrip {
 export type EditorEditHandler = (command: SurfaceEditCommand) => boolean;
 
 export interface FileSurfaceDeps {
+  readonly beforeActivate?: () => void;
+  readonly canFocus?: () => boolean;
   readonly client?: FileClient;
   /** Ask before discarding unsaved work. Defaults to the shared close guard. */
   readonly confirmDiscard?: (dirtyFiles: readonly string[]) => Promise<boolean>;
@@ -344,10 +346,11 @@ export function createFileSurfaceController(deps: FileSurfaceDeps = {}): FileSur
     const strip = stripFileTabs();
     const target = strip[index];
     if (target !== undefined) {
+      deps.beforeActivate?.();
       activateFileTab(activeWorkspace.value as string, target.path);
       notify();
       refreshWatch();
-      focusEditor?.();
+      if (deps.canFocus?.() !== false) focusEditor?.();
       return;
     }
     // The strip's segment is empty but the window still holds file tabs in
@@ -356,10 +359,11 @@ export function createFileSurfaceController(deps: FileSurfaceDeps = {}): FileSur
     for (const [workspacePath, surface] of fileSurfaces.value) {
       const first = surface.tabs[0];
       if (first !== undefined) {
+        deps.beforeActivate?.();
         activateFileTab(workspacePath, first.path);
         notify();
         refreshWatch();
-        focusEditor?.();
+        if (deps.canFocus?.() !== false) focusEditor?.();
         return;
       }
     }
@@ -421,20 +425,22 @@ export function createFileSurfaceController(deps: FileSurfaceDeps = {}): FileSur
       if (position !== undefined) {
         requestReveal(path, position.line, position.column);
       }
+      deps.beforeActivate?.();
       const isNew = openFileTab(workspacePath, path, { keep });
       notify();
       refreshWatch();
       if (isNew) {
         await readDocument(workspacePath, path);
       }
-      focusEditor?.();
+      if (deps.canFocus?.() !== false) focusEditor?.();
     },
 
     activateFile(workspacePath, path) {
+      deps.beforeActivate?.();
       activateFileTab(workspacePath, path);
       notify();
       refreshWatch();
-      focusEditor?.();
+      if (deps.canFocus?.() !== false) focusEditor?.();
       void this.reconcile();
     },
 
@@ -722,7 +728,7 @@ export function createFileSurfaceController(deps: FileSurfaceDeps = {}): FileSur
       notify();
     },
     focus() {
-      focusEditor?.();
+      if (deps.canFocus?.() !== false) focusEditor?.();
     },
     async close() {
       const path = activeFileTab.value;

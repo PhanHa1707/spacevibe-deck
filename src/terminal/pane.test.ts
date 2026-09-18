@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
-import { beforeAll, describe, expect, it } from "vitest";
+import { act } from "preact/test-utils";
+import { tabViews } from "./tabs-store";
+import { Terminal } from "@xterm/xterm";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, type Settings } from "../settings/settings-schema";
 import { createPane, type PaneEvents } from "./pane";
 
@@ -58,5 +61,80 @@ describe("Pane transfer primitives", () => {
     expect(pane.cols).toBe(133);
     expect(pane.rows).toBe(41);
     pane.dispose();
+  });
+});
+
+describe("Pane input provenance", () => {
+  it("distinguishes an automatic cursor report from a real paste", async () => {
+    const writes: Array<{ data: string; userInput: boolean }> = [];
+    const pane = createPane(7, DEFAULT_SETTINGS as Settings, {
+      ...silentEvents,
+      onData: async (_id, data, userInput = false) => {
+        writes.push({ data, userInput });
+        return true;
+      },
+    });
+    // Keep the real onData path; only bypass browser textarea cleanup.
+    const paste = vi.spyOn(Terminal.prototype, "paste").mockImplementation(function (
+      this: Terminal,
+      text,
+    ) {
+      this.input(text, true);
+    });
+    pane.write("\x1b[6n");
+    await pane.flush();
+    expect(writes.some((write) => write.data.endsWith("R") && !write.userInput)).toBe(true);
+    await pane.pasteText("first prompt");
+    paste.mockRestore();
+    expect(writes.at(-1)).toEqual({ data: "first prompt", userInput: true });
+    pane.dispose();
+  });
+});
+
+describe("Claude header input routing", () => {
+  it("sends the native picker shortcut to its own pane through the existing input handler", async () => {
+    vi.stubGlobal("__deckHost", {});
+    const onData = vi.fn(async () => true);
+    const focus = vi.spyOn(Terminal.prototype, "focus").mockImplementation(() => {});
+    let pane: ReturnType<typeof createPane> | undefined;
+    try {
+      tabViews.value = [
+        {
+          key: 1,
+          process: "claude",
+          name: null,
+          dotColor: null,
+          workspacePath: "/repo",
+          agents: ["claude"],
+          agentBusy: false,
+          unread: false,
+          panes: [
+            {
+              paneId: 17,
+              agent: "claude",
+              attention: "none",
+              phase: "idle",
+              hasRun: false,
+              changedAt: 0,
+            },
+          ],
+        },
+      ];
+      act(() => {
+        pane = createPane(17, DEFAULT_SETTINGS as Settings, { ...silentEvents, onData });
+      });
+      await act(async () =>
+        pane!.element
+          .querySelector<HTMLButtonElement>('[aria-label="Change Claude Code effort"]')!
+          .click(),
+      );
+      expect(onData).toHaveBeenCalledExactlyOnceWith(17, "\x1bp", true);
+      expect(focus).toHaveBeenCalledOnce();
+    } finally {
+      act(() => pane?.dispose());
+      tabViews.value = [];
+      focus.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 });

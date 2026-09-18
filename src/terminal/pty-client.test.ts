@@ -93,3 +93,41 @@ describe("createTauriPtyClient Agent Board Stop", () => {
     expect(invoke).toHaveBeenCalledWith("pty_kill_foreground", { id: 7 });
   });
 });
+
+describe("pty-info Codex identity boundary", () => {
+  it("degrades identity to null when the client was created without Electron availability", async () => {
+    vi.stubGlobal("__deckHost", undefined);
+    const pty = createTauriPtyClient();
+    vi.stubGlobal("__deckHost", {
+      invoke: async () => [
+        {
+          id: 1,
+          agent: "codex",
+          codexSessionId: "01900000-0000-7000-8000-000000000001",
+        },
+      ],
+    });
+    expect((await pty.ptyInfo([1]))[0].codexSessionId).toBeNull();
+  });
+  it("accepts only a valid exact thread id, and keeps flat command arguments", async () => {
+    const thread = "01900000-0000-7000-8000-000000000001";
+    const rows = [thread, "../wrong", 42, null].map((codexSessionId, index) => ({
+      id: index + 1,
+      processId: 42 + index,
+      cwd: "/w",
+      process: "codex",
+      kind: "agent",
+      agent: "codex",
+      codexSessionId,
+    }));
+    const invoke = vi.fn(async () => rows);
+    vi.stubGlobal("__deckHost", { invoke, listen: vi.fn() });
+    const infos = await createTauriPtyClient().ptyInfo([1, 2, 3, 4]);
+    expect(infos.map((info) => info.codexSessionId)).toEqual([thread, null, null, null]);
+    expect(invoke).toHaveBeenCalledWith("pty_info", {
+      ids: [1, 2, 3, 4],
+      agents: [],
+      waitForCwd: true,
+    });
+  });
+});

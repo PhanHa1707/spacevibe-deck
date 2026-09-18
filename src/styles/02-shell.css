@@ -33,13 +33,14 @@
    rather than laying them out. */
 
 .deck-frame {
+  box-sizing: border-box;
   height: var(--frame-h);
   /* DL-18.3: in sidebar mode the frame is the TOP OF THE NAVIGATION COLUMN, not
-     a band across the window. It shares `--sidebar-bg` with the rail below,
-     so there is no seam between them: the frame and rail are one continuous
-     surface (DL-18.7). The seam that matters runs vertically, on the stage's
-     left edge. */
+     a band across the window. It shares `--sidebar-bg` with the rail below
+     (DL-18.7). DL-18.9 adds a bottom hairline separating
+     the identity row from workspace navigation. */
   background: var(--sidebar-bg);
+  border-bottom: 1px solid var(--hair-strong);
   grid-column: 1;
   grid-row: 1;
   display: flex;
@@ -68,22 +69,79 @@
   align-self: stretch;
 }
 
-/* The open sidebar keeps its two leading actions as one compact cluster:
-   collapse first, then `New` (DL-18.9 / DL-27.14). */
+/* DL-18.9: the collapse control and product identity share the top row. */
 .sidebar-frame-actions {
   display: flex;
-  flex: none;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   gap: 2px;
 }
 
+.sidebar-frame-actions + .deck-frame__spacer {
+  display: none;
+}
+
+.sidebar-frame-actions__spacer {
+  flex: 1;
+  align-self: stretch;
+}
+
+.sidebar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+  min-width: 0;
+  color: var(--text-primary);
+  font: 600 var(--type-title) / 1 var(--ui-font);
+  white-space: nowrap;
+}
+
+.sidebar-brand img {
+  display: block;
+  flex: none;
+}
+
+.sidebar-brand__version {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-muted);
+  font: 400 var(--type-meta) / 1 var(--ui-font);
+}
+
+/* DL-2.1: the local-build badge follows the theme's accent tokens. */
+.sidebar-brand__dev {
+  flex: none;
+  padding: 3px 5px;
+  border-radius: var(--radius-tight);
+  background: var(--accent);
+  color: var(--bg);
+  font: 700 var(--type-micro) / 1 var(--ui-font);
+}
+
+/* DL-27.14: keep the launcher above the project scrollport. */
+.sidebar-launcher {
+  flex: none;
+  padding: 0 6px 8px 0;
+}
+
+.sidebar-launcher .sidebar-new {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--frame-h);
+  padding-inline: 7px;
+}
+
 .sidebar-new {
+  box-sizing: border-box;
   display: flex;
   height: 24px;
   align-items: center;
   gap: 4px;
   padding: 0 6px;
-  border: 0;
+  border: 1px solid var(--hair-strong);
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-muted);
@@ -133,10 +191,9 @@
    NOT a second figure declared here: one width, one owner.
 
    The grip is DL-19.4's drag target applied to the other edge of the window:
-   wider than the hairline it sits on so it can be hit, painting nothing so
-   the hairline (`.window--sidebar > .stage`'s border-left) stays 1px. It
-   shares the rail's grid cell and pins to its trailing edge, so it follows
-   the column at any width without the shell needing a wrapper. */
+   wider than the seam it sits on so it can be hit, and painting nothing at
+   rest. It shares the rail's grid cell and pins to its trailing edge, so it
+   follows the column at any width without the shell needing a wrapper. */
 
 .sidebar-grip {
   grid-column: 1;
@@ -171,24 +228,32 @@
    that gives no feedback until the column moves is a target the user finds by
    guessing; this is the app's existing answer to that, applied to the other
    two seams rather than a second idiom invented for them.
-   Exactly 1px wide and placed ON the shell's own hairline (4px in, since the
-   target starts 4px inside the column), so the line lights up — it does not
-   add a second one beside it. */
+   Amended 2026-09-18 (owner): it fills the GUTTER instead of drawing a 1px
+   line. The target starts 4px inside the column and the stage's own hairline
+   is gone (above), so `left: 4px` plus `--stage-gutter` is the gutter exactly
+   — no arithmetic, and nothing to re-derive if the gutter changes. Lighting
+   the hairline was what made the gesture read as "grabbing the sidebar's
+   border"; the bar the user grabs now sits BETWEEN the two surfaces it
+   moves. */
 .sidebar-grip::after {
   content: "";
   position: absolute;
   top: 0;
   bottom: 0;
   left: 4px;
-  width: 1px;
+  width: var(--stage-gutter);
+  /* A bar, not a rule: the same 2px `--radius-flat` a dense detail takes
+     (DL-20.1), so a 4px-wide accent does not read as a blunt block. */
+  border-radius: var(--radius-flat);
   background: transparent;
   transition: background var(--duration) var(--ease);
 }
 
-/* Full `--accent`, not the 60% mix a pane split divider uses: this seam has a
-   chrome surface on at least one side of it (`--sidebar-bg`), and at 60% the
-   line read as a slightly lighter hairline rather than as an answer. A split
-   divider sits between two terminals on `--bg`, where 60% is plenty. */
+/* Full `--accent`, and since 2026-09-18 the pane split divider matches it
+   (`06-stage-panes.css`). The 60% mix the split used to take was justified by
+   a difference that no longer exists — "a split sits between two terminals on
+   `--bg`, this seam has chrome on one side" — because both are now a 4px
+   chrome gutter between two `--bg` cards. One idiom, one value. */
 .sidebar-grip:hover::after,
 .sidebar-grip.is-dragging::after {
   background: var(--accent);
@@ -211,12 +276,10 @@
   display: none;
 }
 
-/* The stage takes the whole width, and its own leading hairline goes: with no
-   column on the other side of it there are no two surfaces for a seam to
-   separate (DL-2.3). */
+/* The stage takes the whole width. There is no hairline left to clear here —
+   the open layout stopped drawing one on 2026-09-18 (see above). */
 [data-sidebar-collapsed="true"] .window--sidebar > .stage {
   grid-column: 1 / -1;
-  border-left: none;
 }
 
 [data-sidebar-collapsed="true"] .stage__strip {

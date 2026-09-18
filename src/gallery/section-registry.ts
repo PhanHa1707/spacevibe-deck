@@ -1,4 +1,5 @@
 import type { ComponentType } from "preact";
+import { QuickAgentBoardSection } from "./sections/quick-agent-board";
 import { AgentBoardSection } from "./sections/agent-board-section";
 import { AttentionDirectionSection } from "./sections/attention-direction";
 import { BoardSection } from "./sections/board-section";
@@ -50,6 +51,7 @@ export interface GallerySection {
  * `window chrome`, next to the shell it cross-checks.
  */
 export const GALLERY_SECTIONS: readonly GallerySection[] = [
+  { id: "quick-agent-board", label: "quick agent board", Section: QuickAgentBoardSection },
   { id: "tokens", label: "direction tokens", Section: TokensSection },
   { id: "rows", label: "config rows", Section: RowsSection },
   {

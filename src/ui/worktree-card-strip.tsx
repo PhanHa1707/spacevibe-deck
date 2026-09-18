@@ -287,6 +287,7 @@ export interface CardStripProps {
   /** Omitted where nothing can wire the actions menu — the `+` then goes
    * (DL-19.7), because a launcher that opens nothing is worse than none. */
   readonly onOpenActions?: (trigger: HTMLElement) => void;
+  readonly opensPage?: boolean;
   readonly actionsOpen: boolean;
 }
 
@@ -518,9 +519,9 @@ export function CardStrip(props: CardStripProps) {
             type="button"
             class="asr-card__seg asr-card__seg--add"
             data-fit-role="add"
-            aria-haspopup="menu"
-            aria-expanded={props.actionsOpen}
-            aria-label={`Actions for ${whereOf(project, group)}`}
+            aria-haspopup={props.opensPage ? undefined : "menu"}
+            aria-expanded={props.opensPage ? undefined : props.actionsOpen}
+            aria-label={`${props.opensPage ? "New agent in" : "Actions for"} ${whereOf(project, group)}`}
             onClick={(event) => {
               close();
               props.onOpenActions?.(event.currentTarget);

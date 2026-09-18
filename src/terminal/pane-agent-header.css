@@ -1,0 +1,78 @@
+/* DL-32.7: quiet per-pane controls, using the rail's message. */
+.pane-agent-header-host {
+  display: none;
+  min-width: 0;
+  flex: 1;
+}
+.pane--agent-header > .pane__bar > :not(.pane-agent-header-host) {
+  display: none;
+}
+.pane--agent-header > .pane__bar > .pane-agent-header-host {
+  display: block;
+}
+.pane-bar-hidden .pane--agent-header > .pane__bar {
+  display: flex;
+}
+.pane--agent-header > .pane__bar {
+  padding: 0 10px;
+  height: 33px;
+  /* DL-3.3: distinguish the header through a neutral surface step. */
+  background: var(--chrome-2);
+  border-bottom-color: var(--seam-divider);
+}
+.pane-bar-hidden .pane--agent-header > .pane__anchor {
+  display: none;
+}
+.pane-agent-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-primary);
+}
+.pane-agent-header__identity {
+  display: flex;
+  flex-shrink: 0;
+}
+.pane-agent-header__logo {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+.pane-agent-header__message {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--type-meta) var(--ui-font);
+  font-weight: 500;
+}
+.pane-agent-header__control {
+  position: relative;
+  flex-shrink: 0;
+}
+.pane-agent-header__control button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+  background: var(--chrome-1);
+  color: var(--text-muted);
+  font: var(--type-micro) var(--ui-font);
+  cursor: pointer;
+}
+.pane-agent-header__control button:hover:not(:disabled) {
+  background: var(--state-hover-bg);
+  color: var(--text-primary);
+}
+.pane-agent-header__control button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.pane-agent-header__control button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}

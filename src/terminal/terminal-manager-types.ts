@@ -9,6 +9,8 @@ import type { AdoptResult } from "./pane-adopt";
 import type { TransferClient } from "./transfer-client";
 
 export interface ManagerCallbacks {
+  /** A genuine input write reached this pane, excluding terminal protocol replies. */
+  onPaneInput?(id: number): void;
   /** Fired after any structural change (split, close, ratio commit). */
   onLayoutChange(): void;
   /** Fired when a pane requests attention (OSC 9/777 notification or bell). */
@@ -88,16 +90,27 @@ export interface AdoptIntoActiveTabRequest {
 export const TRANSFER_FALLBACK_COLS = 80;
 export const TRANSFER_FALLBACK_ROWS = 24;
 
+/** Optional transaction boundary for the transient agent launcher. */
+export interface PaneCreationOptions {
+  readonly focus?: boolean;
+  readonly canCommit?: () => boolean;
+  readonly cwd?: string;
+}
+
 /** One tab's worth of terminals: a split tree of panes sharing a container. */
 export interface TerminalManager {
   /** Spawn a single fresh shell (at `cwd` when given). Throws when the spawn fails. */
-  initFresh(cwd?: string | null): Promise<void>;
+  initFresh(cwd?: string | null, options?: PaneCreationOptions): Promise<void>;
   /**
    * Spawn one shell per leaf and rebuild the split structure. `cwds` maps to
    * leaves in left-to-right order (missing/null entries → $HOME). Throws when
    * any spawn fails.
    */
-  initFromLayout(layout: SerializedNode, cwds?: readonly (string | null)[]): Promise<void>;
+  initFromLayout(
+    layout: SerializedNode,
+    cwds?: readonly (string | null)[],
+    options?: PaneCreationOptions,
+  ): Promise<void>;
   /**
    * Displays the container and fits every pane. `focus` defaults to `true`
    * (focuses the active pane, matching the historical behavior); internal
@@ -118,7 +131,12 @@ export interface TerminalManager {
    * caller decides what — if anything — the pane then runs: the returned id is
    * what `TabManager` arms an agent command against.
    */
-  dockNewPaneAt(targetPaneId: number, edge: Edge): Promise<number | null>;
+  dockNewPaneAt(
+    targetPaneId: number,
+    edge: Edge,
+    options?: PaneCreationOptions,
+  ): Promise<number | null>;
+  isPaneLaunchable(id: number): boolean;
   /** Live slot geometry, for a drag hit-testing panes from outside the stage. */
   slotRects(): readonly PaneRect[];
   closeActive(): Promise<void>;

@@ -305,3 +305,27 @@
     animation: fb-pop-in 360ms var(--fb-ease);
   }
 }
+
+.feedback-card__description {
+  margin: 0;
+  color: var(--log-ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.feedback-auth {
+  display: grid;
+  gap: 0.65rem;
+  justify-items: start;
+}
+
+.feedback-auth[hidden] {
+  display: none;
+}
+
+[data-page-status]:empty,
+[data-board-more][hidden] {
+  display: none;
+}

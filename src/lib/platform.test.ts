@@ -68,6 +68,17 @@ describe("desktop environment", () => {
     ).toThrow("already initialized");
   });
 
+  it("preserves the host development flag and rejects non-boolean flags", () => {
+    for (const isDevelopment of [true, false]) {
+      expect(
+        parseDesktopEnvironment({ platform: "macos", homeDir: "/Users/dev", isDevelopment }),
+      ).toEqual({ platform: "macos", homeDir: "/Users/dev", isDevelopment });
+    }
+    expect(() =>
+      parseDesktopEnvironment({ platform: "macos", homeDir: "/Users/dev", isDevelopment: "true" }),
+    ).toThrow("isDevelopment must be a boolean");
+  });
+
   it("maps the primary modifier from the initialized platform", () => {
     initializeDesktopEnvironment({
       platform: "windows",

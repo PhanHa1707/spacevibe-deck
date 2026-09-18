@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { build } from "esbuild";
+import { FEEDBACK_SYNC_CRON } from "./feedback-sync.mjs";
 import { FEEDBACK_PROBE_CRON } from "./linear-feedback.mjs";
 import { AGENT_KEYS, SURFACE_KEYS, UPDATE_KEYS, COUNTER_CAP, validPayload } from "./payload.mjs";
 
@@ -80,14 +81,15 @@ test("deployment disables logs, traces, public preview URLs and exposes only the
   // drifted schedule would keep raw rows past it and nothing else would notice,
   // because logs and traces are off by design.
   // The second cron is the hourly feedback probe; the Worker dispatches on it.
-  assert.deepEqual(config.triggers.crons, ["0 3 * * *", FEEDBACK_PROBE_CRON]);
+  assert.deepEqual(config.triggers.crons, ["0 3 * * *", FEEDBACK_PROBE_CRON, FEEDBACK_SYNC_CRON]);
 });
 
 test("privacy routes publish the dated notice and include its source in the deployment", async () => {
   const config = JSON.parse(await readFile(new URL("../../vercel.json", import.meta.url), "utf8"));
   // `/privacy` serves the newest notice; every earlier dated copy stays reachable.
   for (const [source, notice] of [
-    ["/privacy", "2026-09-12"],
+    ["/privacy", "2026-09-18"],
+    ["/privacy/2026-09-18", "2026-09-18"],
     ["/privacy/2026-09-12", "2026-09-12"],
     ["/privacy/2026-09-07", "2026-09-07"],
   ]) {
@@ -101,7 +103,7 @@ test("privacy routes publish the dated notice and include its source in the depl
   const ignore = await readFile(new URL("../../.vercelignore", import.meta.url), "utf8");
   assert.ok(ignore.includes("!/marketing/public"));
   const html = await readFile(
-    new URL("../../marketing/public/privacy/2026-09-12/index.html", import.meta.url),
+    new URL("../../marketing/public/privacy/2026-09-18/index.html", import.meta.url),
     "utf8",
   );
   assert.doesNotMatch(html, /anonymous/i);
@@ -116,6 +118,10 @@ test("privacy routes publish the dated notice and include its source in the depl
     "no in-app opt-out",
     "1.0.0",
     "Share usage stats",
+    "Google",
+    "Resend",
+    "private until",
+    "do not automatically expire",
   ]) {
     assert.ok(html.replace(/\s+/g, " ").includes(term), term);
   }

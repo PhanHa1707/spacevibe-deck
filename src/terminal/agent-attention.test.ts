@@ -909,3 +909,128 @@ describe("AgentAttentionTracker — actionable", () => {
     expect(tracker.actionable()).toEqual([]);
   });
 });
+
+describe("Codex process session identity", () => {
+  it("records identity without inventing lifecycle or attention", () => {
+    const { tracker } = setup();
+    tracker.noteProcess(1, "codex", true);
+    const before = tracker.snapshot(1)!;
+    tracker.noteProcessSession(1, 42, "own");
+    expect(tracker.snapshot(1)).toMatchObject({
+      sessionId: "own",
+      hasRun: false,
+      phase: before.phase,
+      attention: before.attention,
+      phaseConfidence: before.phaseConfidence,
+    });
+    tracker.noteProcessSession(1, 42, null);
+    expect(tracker.snapshot(1)?.sessionId).toBeNull();
+  });
+  it("forgets the prior process identity and refuses non-Codex panes", () => {
+    const { tracker } = setup();
+    tracker.noteProcess(1, "codex", true);
+    tracker.noteProcessSession(1, 42, "old");
+    tracker.noteProcessSession(1, 43, null);
+    expect(tracker.snapshot(1)?.sessionId).toBeNull();
+    tracker.noteProcess(1, "claude", true);
+    tracker.noteProcessSession(1, 43, "wrong");
+    expect(tracker.snapshot(1)?.sessionId).toBeNull();
+  });
+});
+
+describe("Codex startup input eligibility", () => {
+  function setupStartup() {
+    let clock = 1000;
+    const tracker = createAgentAttentionTracker({ now: () => clock });
+    const output = () =>
+      tracker.noteActivity(1, {
+        phase: "working",
+        source: "output-heuristic",
+        severity: null,
+        oscState: null,
+        observedAt: clock + 500,
+        evidenceStartedAt: clock,
+      });
+    return {
+      tracker,
+      output,
+      tick: () => {
+        clock += 1000;
+      },
+    };
+  }
+
+  it("does not infer work or completion from startup output without real input", () => {
+    const { tracker, output } = setupStartup();
+    tracker.noteProcess(1, "codex", true);
+    expect(output()).toBeNull();
+    tracker.noteActivity(1, {
+      phase: "idle",
+      source: "output-heuristic",
+      severity: null,
+      oscState: null,
+      observedAt: 5000,
+    });
+    expect(tracker.snapshot(1)).toMatchObject({ hasRun: false, attention: "none" });
+  });
+
+  it("accepts real input, and resets eligibility when the process is replaced", () => {
+    const { tracker, output, tick } = setupStartup();
+    tracker.noteProcess(1, "codex", true);
+    tracker.noteInput(1);
+    expect(output()).toMatchObject({ phase: "working", hasRun: true });
+    tick();
+    tracker.noteProcess(1, "zsh", false);
+    tick();
+    tracker.noteProcess(1, "codex", true);
+    expect(output()).toBeNull();
+    expect(tracker.snapshot(1)?.hasRun).toBe(false);
+  });
+
+  it("keeps prompt input after a launch but before the first agent poll", () => {
+    const { tracker, output } = setupStartup();
+    tracker.noteProcess(1, "zsh", false);
+    tracker.noteLaunch(1);
+    tracker.noteInput(1);
+    tracker.noteProcess(1, "codex", true);
+    expect(output()).toMatchObject({ phase: "working", hasRun: true });
+  });
+
+  it("does not treat a launch or shell typing as agent input", () => {
+    const { tracker, output } = setupStartup();
+    tracker.noteProcess(1, "zsh", false);
+    tracker.noteInput(1);
+    tracker.noteLaunch(1);
+    tracker.noteProcess(1, "codex", true);
+    expect(output()).toBeNull();
+  });
+
+  it("preserves explicit work reports without keyboard input", () => {
+    const { tracker } = setupStartup();
+    tracker.noteProcess(1, "codex", true);
+    expect(
+      tracker.noteActivity(1, {
+        phase: "working",
+        source: "osc-progress",
+        severity: null,
+        oscState: 3,
+        observedAt: 1500,
+      }),
+    ).toMatchObject({ hasRun: true });
+  });
+});
+
+it("retains real pre-poll Codex work after a launched prompt", () => {
+  const tracker = createAgentAttentionTracker({ now: () => 2000 });
+  tracker.noteProcess(1, "zsh", false);
+  tracker.noteLaunch(1);
+  tracker.noteInput(1);
+  expect(
+    tracker.noteProcess(1, "codex", true, {
+      phase: "working",
+      source: "output-heuristic",
+      severity: null,
+      oscState: null,
+    }),
+  ).toMatchObject({ phase: "working", phaseConfidence: "inferred", hasRun: true });
+});

@@ -19,7 +19,11 @@ import { buildAgentRail, type RailStreamGroup } from "./agent-rail-model";
 import { WorktreeCard } from "./worktree-card";
 import type { CardActions } from "./worktree-card-menus";
 import { RepositoryRail } from "./repository-rail";
+import { SidebarNewButton } from "./sidebar-toggle";
+import type { NewPaneDropDeps } from "./new-pane-drag";
 import { isTauriHost } from "../updater/migration-notice";
+import { invoke } from "../host/bridge";
+import { validateLogoDataUrl } from "../settings/logo-store";
 
 /**
  * The agent status rail.
@@ -31,8 +35,8 @@ import { isTauriHost } from "../updater/migration-notice";
  * checkout), never what selecting or closing a tab means (R4).
  *
  * One list, no mode switch: a cluster per project in the order the user opened
- * them. The `New` launcher moved to the frame beside `SidebarToggle` on
- * 2026-08-19. Since 2026-08-20 (owner) the rail is no longer live work only:
+ * them. The `New` launcher stays above the scrolling list, beneath the
+ * sidebar identity row (DL-27.14). Since 2026-08-20 (owner) the rail is no longer live work only:
  * a REMEMBERED project — a workspace-history entry whose last tab has closed —
  * keeps its header, so closing the work does not remove the place it ran in.
  * Since `rail-create-consolidation` (2026-09-02) that header carries no `+`;
@@ -59,6 +63,7 @@ import { isTauriHost } from "../updater/migration-notice";
 export { RailStatusMark } from "./controls/rail-status-mark";
 
 export interface AgentRailProps {
+  readonly newPaneDrop?: NewPaneDropDeps;
   /** Stable Tauri fallback callbacks; worktree cards are Electron-only. */
   readonly legacy: {
     readonly onOpenWorkspace: () => void;
@@ -141,6 +146,49 @@ export interface AgentRailProps {
    * passes it to both; the rail lists no file tabs and opens none regardless.
    */
   fileController: FileSurfaceController;
+}
+
+/** Keep the project identity in the existing DL-27.17 icon slot. */
+function WorkspaceIcon({ path }: { readonly path: string | null }) {
+  const favicon = useSignal("");
+  useEffect(() => {
+    if (!path) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await invoke<unknown>("scan_workspace_favicon", { dir: path });
+        if (!cancelled) favicon.value = validateLogoDataUrl(result);
+      } catch (error) {
+        console.warn("Failed to load workspace favicon:", path, error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // `favicon` is a signal whose identity never changes, so listing it would
+    // add a dependency that cannot vary. The path is the whole input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path]);
+
+  return (
+    <span class="asr-cluster__folder" aria-hidden="true">
+      {favicon.value ? (
+        <img
+          src={favicon.value}
+          alt=""
+          width={FEATURE_ICON}
+          height={FEATURE_ICON}
+          draggable={false}
+          style={{ objectFit: "contain" }}
+          onError={() => {
+            favicon.value = "";
+          }}
+        />
+      ) : (
+        <DeckIcon icon={Folder} size={FEATURE_ICON} filled />
+      )}
+    </span>
+  );
 }
 
 function WorktreeCardRail(props: AgentRailProps) {
@@ -272,6 +320,13 @@ function WorktreeCardRail(props: AgentRailProps) {
 
   return (
     <nav class="asr-rail asr-rail--mounted" aria-label="Agents">
+      <div class="sidebar-launcher">
+        <SidebarNewButton
+          disabled={props.legacy.openWorkspaceDisabled}
+          onOpenWorkspace={props.legacy.onOpenWorkspace}
+          newPaneDrop={props.newPaneDrop}
+        />
+      </div>
       {/* The scrolling half: the rows. The footer and the banner below stay
           pinned to the bottom of the column, which is the split `.wsbar__list`
           drew before this rail replaced it. */}
@@ -309,6 +364,8 @@ function WorktreeCardRail(props: AgentRailProps) {
         <section class="asr-stream" aria-label="Open agents">
           {view.stream.map((group) => {
             const collapsed = collapsedGroupKeys.value.has(group.key);
+            const iconPath =
+              group.worktrees[0]?.repositoryPath ?? group.worktrees[0]?.path ?? group.path;
             // A LIVE cluster is one with something OPEN in it — the old
             // `rows.length > 0` question, asked of the tab indexes the header's
             // ✕ would close. Not `worktrees.length`: since
@@ -355,9 +412,7 @@ function WorktreeCardRail(props: AgentRailProps) {
                           toggleGroup(group.key);
                         }}
                       >
-                        <span class="asr-cluster__folder" aria-hidden="true">
-                          <DeckIcon icon={Folder} size={FEATURE_ICON} filled />
-                        </span>
+                        <WorkspaceIcon key={iconPath} path={iconPath} />
                         <span class="asr-cluster__name">{group.project}</span>
                         <span class="asr-cluster__caret" aria-hidden="true">
                           <DeckIcon icon={CaretRight} size={CHROME_ICON} />
@@ -371,9 +426,7 @@ function WorktreeCardRail(props: AgentRailProps) {
                          control beside it is the one action the header offers
                          — the checkouts under it carry the create control. */
                       <span class="asr-cluster__still">
-                        <span class="asr-cluster__folder" aria-hidden="true">
-                          <DeckIcon icon={Folder} size={FEATURE_ICON} filled />
-                        </span>
+                        <WorkspaceIcon key={iconPath} path={iconPath} />
                         <span class="asr-cluster__name">{group.project}</span>
                       </span>
                     )}
@@ -475,6 +528,15 @@ export function AgentRail(props: AgentRailProps) {
   if (isTauriHost()) {
     return (
       <RepositoryRail
+        header={
+          <div class="sidebar-launcher">
+            <SidebarNewButton
+              disabled={props.legacy.openWorkspaceDisabled}
+              onOpenWorkspace={props.legacy.onOpenWorkspace}
+              newPaneDrop={props.newPaneDrop}
+            />
+          </div>
+        }
         onSelectTab={props.onSelectTab}
         onCloseTab={props.onCloseTab}
         onOpenWorkspace={props.legacy.onOpenWorkspace}

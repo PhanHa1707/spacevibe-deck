@@ -994,3 +994,45 @@ describe("WorktreeCard unlabelled checkout", () => {
     expect(host.querySelectorAll(".asr-card__row")).toHaveLength(2);
   });
 });
+
+describe("agent launcher create controls", () => {
+  it.each([true, false])(
+    "opens the page from the create control (expanded=%s), retaining rightclick",
+    (open) => {
+      const onOpenAgentLauncher = vi.fn();
+      const actions = { ...cardActions(), onOpenAgentLauncher };
+      mount({ group: group({ panes: [pane()] }), open, actions });
+      const trigger = host.querySelector<HTMLButtonElement>(
+        open ? ".asr-card__new" : ".asr-card__seg--add",
+      )!;
+      expect(trigger.hasAttribute("aria-haspopup")).toBe(false);
+      act(() => trigger.click());
+      expect(onOpenAgentLauncher).toHaveBeenCalledOnce();
+      expect(actions.onRunAgent).not.toHaveBeenCalled();
+      expect(host.querySelector('[role="menu"]')).toBeNull();
+      act(
+        () =>
+          void host
+            .querySelector(".asr-card")!
+            .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true })),
+      );
+      expect(host.querySelector('[role="menu"]')).not.toBeNull();
+    },
+  );
+
+  // The flat shape has no `.asr-card` to right-click, so before the create row
+  // carried the gesture this path lost every pointer route to `Open shell`.
+  it("keeps the actions menu reachable for a folder git does not know", () => {
+    const onOpenAgentLauncher = vi.fn();
+    const actions = { ...cardActions(), onOpenAgentLauncher };
+    mount({ group: group({ labelled: false, panes: [pane()] }), actions });
+    expect(host.querySelector(".asr-card")).toBeNull();
+    const row = host.querySelector<HTMLButtonElement>(".asr-card__new")!;
+    act(() => row.click());
+    expect(onOpenAgentLauncher).toHaveBeenCalledOnce();
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+    act(() => void row.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true })));
+    expect(host.querySelector('[role="menu"]')).not.toBeNull();
+    expect(onOpenAgentLauncher).toHaveBeenCalledOnce();
+  });
+});

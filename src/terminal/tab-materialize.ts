@@ -118,6 +118,9 @@ export interface MaterializeChrome {
  * TabManager.materialize owns the implementation.
  */
 export interface MaterializeIntent {
+  /** Transient launcher only; defaults preserve restore/preset behavior. */
+  readonly canCommit?: () => boolean;
+  readonly focusOnInit?: boolean;
   readonly layout: SerializedNode | null;
   readonly cwds: readonly (string | null)[];
   /**

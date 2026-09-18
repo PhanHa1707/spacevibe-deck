@@ -158,16 +158,12 @@ const LIGHT_SEAM_RAISED_STEP = 0.14;
  * background and the pin stops applying, because it was picked FOR that
  * background.
  *
- * `#161b22` is not reachable by mixing `#17181c` toward white — a lift raises
- * every channel, and this gray drops red while raising blue — so it is a
- * literal, and DL-2.2 carries the exception. It replaced `#272d31` on
- * 2026-08-25 at the owner's request: the column now sits a hair above the
- * stage rather than clearly above it, so the whole dark ladder starts lower.
- *
- * The key is `deck-dark`'s own `background` in `themes.ts`. Editing that value
- * without editing this one silently retires the pin.
+ * Deck's neutral-black stage pins a #141414 sidebar (2026-09-18), keeping
+ * the chrome ladder dark while separating the side columns from the pane.
+ * The former blue-gray pin remains for legacy background overrides.
  */
 const PINNED_SIDEBAR_BG: Readonly<Record<string, string>> = Object.freeze({
+  "#0a0a0a": "#141414",
   "#17181c": "#161b22",
 });
 

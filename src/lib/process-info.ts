@@ -9,6 +9,8 @@ export interface PaneProcessInfo {
   readonly id: number;
   /** Foreground OS process identity; null when the host cannot inspect it. */
   readonly processId?: number | null;
+  /** Electron-only exact Codex writer-lock identity; absent on older hosts. */
+  readonly codexSessionId?: string | null;
   readonly cwd: string | null;
   readonly process: string | null;
   readonly kind: PaneProcessKind;

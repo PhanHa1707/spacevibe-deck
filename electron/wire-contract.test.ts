@@ -79,6 +79,7 @@ describe("desktop_environment", () => {
     // the caller swallowed it, and the app fell back to platform "unsupported"
     // where `hasPrimaryModifier` is false for every event.
     expect(SERVICES).toContain('homeDir: app.getPath("home")');
+    expect(SERVICES).toContain("isDevelopment: !app.isPackaged");
     expect(() =>
       parseDesktopEnvironment({ platform: "macos", homeDir: "/Users/dev" }),
     ).not.toThrow();

@@ -643,7 +643,9 @@ describe("AgentRail worktree cards (design 2026-08-25)", () => {
     mount();
     await settle();
 
-    expect(host.querySelector(".wsbar--repos")).not.toBeNull();
+    const rail = host.querySelector(".wsbar--repos");
+    expect(rail?.firstElementChild?.className).toBe("sidebar-launcher");
+    expect(rail?.querySelector(".sidebar-new")).not.toBeNull();
     expect(host.querySelector(".asr-card")).toBeNull();
   });
 });
@@ -1408,11 +1410,14 @@ describe("AgentRail carried-over jobs", () => {
     expect(hit()?.getAttribute("aria-current")).toBe("true");
   });
 
-  it("contains live project rows only; New belongs to the frame", async () => {
+  it("keeps New above the project scrollport", async () => {
     mount();
     await settle();
 
-    expect(host.querySelector(".asr-openrow, .asr-open")).toBeNull();
+    const launcher = host.querySelector(".sidebar-launcher");
+    expect(launcher?.querySelector(".sidebar-new")).not.toBeNull();
+    expect(launcher?.nextElementSibling).toBe(host.querySelector(".asr-rail__list"));
+    expect(host.querySelector(".asr-rail__list")?.contains(launcher)).toBe(false);
     expect(host.querySelector(".asr-stream")?.firstElementChild).not.toBeNull();
   });
 

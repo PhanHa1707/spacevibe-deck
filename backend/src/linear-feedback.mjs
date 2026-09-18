@@ -1,6 +1,6 @@
 /**
- * Linear is the only store for public feedback (DECK-101): the Worker creates
- * issues and reads their state back; the owner moves them in Linear itself.
+ * Linear is the moderation surface. D1 owns the original feedback and retries
+ * delivery here; the owner controls publication by moving the linked issue.
  */
 const LINEAR_ENDPOINT = "https://api.linear.app/graphql";
 // A hung Linear call must not hang the visitor; the landing keeps the draft.
@@ -15,52 +15,24 @@ export const FEEDBACK_PROBE_CRON = "17 * * * *";
 /** Workspace labels in SpaceVibe-Deck. */
 const BUG_LABEL = "ed9079dd-f534-4092-98ec-241335972834";
 const FEATURE_LABEL = "404554e5-9175-474e-b211-1a31ebde49e2";
-const IMPROVEMENT_LABEL = "ad32e36f-0027-41db-9e49-ad99864dc7cc";
 // "Other" carries no Type; the owner picks one while triaging.
 const NEEDS_DECISION_LABEL = "0968e82c-0db3-48ce-83c5-fe4afd04a5b3";
 const LABEL_BY_CATEGORY = { bug: BUG_LABEL, idea: FEATURE_LABEL, other: NEEDS_DECISION_LABEL };
-const TYPE_LABELS = [BUG_LABEL, FEATURE_LABEL, IMPROVEMENT_LABEL];
 const CATEGORY_NAME = { bug: "Bug", idea: "Idea", other: "Other" };
-
-/**
- * Backlog is the moderation gate: an unreviewed submission is never public.
- * Moving it to Todo publishes it. The board asks Linear for published state
- * types only, so Backlog, Canceled and Duplicate never take its slots, and it
- * maps by type so renaming a status neither hides nor leaks cards.
- */
-const STATUS_BY_STATE_TYPE = { unstarted: "pending", started: "review", completed: "done" };
-export const DONE_LIMIT = 30;
-const OPEN_LIMIT = 100;
 
 const CREATE_ISSUE = `mutation CreateFeedback($input: IssueCreateInput!) {
   issueCreate(input: $input) { success }
 }`;
-
 const FIND_ISSUE = `query FindFeedback($id: String!) {
   issue(id: $id) { id }
 }`;
-
-// Every connection names its own `first`: Linear prices an unbounded one at 50
-// nodes, and its complexity budget is shared with the key owner's other tools.
-const BOARD_FILTER = "team: { id: { eq: $team } }, labels: { some: { id: { eq: $label } } }";
-const LIST_ISSUES = `query FeedbackBoard($team: ID!, $label: ID!, $types: [ID!]) {
-  open: issues(
-    first: ${OPEN_LIMIT}
-    orderBy: updatedAt
-    filter: { ${BOARD_FILTER}, state: { type: { in: ["unstarted", "started"] } } }
-  ) { nodes { ...BoardIssue } }
-  done: issues(
-    first: ${DONE_LIMIT}
-    orderBy: updatedAt
-    filter: { ${BOARD_FILTER}, state: { type: { eq: "completed" } } }
-  ) { nodes { ...BoardIssue } }
-}
-fragment BoardIssue on Issue {
-  identifier
-  title
-  updatedAt
-  state { type }
-  labels(first: 3, filter: { id: { in: $types } }) { nodes { id } }
+const FEEDBACK_STATE = `query FeedbackState($id: ID!, $label: ID!) {
+  issues(first: 1, includeArchived: true, filter: { id: { eq: $id } }) {
+    nodes {
+      id identifier updatedAt archivedAt autoArchivedAt team { id } state { id type }
+      labels(first: 1, filter: { id: { eq: $label } }) { nodes { id } }
+    }
+  }
 }`;
 
 const PROBE = `query FeedbackProbe(
@@ -145,54 +117,34 @@ export async function createFeedbackIssue(env, feedback) {
   }
 }
 
-function category(labelIds) {
-  if (labelIds.includes(BUG_LABEL)) return "bug";
-  if (labelIds.includes(FEATURE_LABEL) || labelIds.includes(IMPROVEMENT_LABEL)) return "idea";
-  return "other";
-}
-
-/** Only these five fields leave the Worker; the description never does. */
-export function toBoardItem(issue) {
-  const status = STATUS_BY_STATE_TYPE[issue?.state?.type];
-  if (
-    !status ||
-    typeof issue.identifier !== "string" ||
-    typeof issue.title !== "string" ||
-    typeof issue.updatedAt !== "string"
-  ) {
-    return undefined;
+/** Only D1-owned issue ids are passed here; the public board never queries Linear. */
+export async function readFeedbackState(env, id) {
+  const data = await linear(env, FEEDBACK_STATE, { id, label: env.FEEDBACK_LABEL_ID });
+  const issue = data.issues?.nodes?.[0];
+  // Missing/inaccessible is not proof of owner deletion. Signed remove events
+  // handle deletion; an API outage must never silently remove public feedback.
+  if (!issue || issue.id !== id || !issue.state || !Array.isArray(issue.labels?.nodes)) {
+    throw new Error("Feedback issue is unavailable");
   }
-  const labelIds = (issue.labels?.nodes ?? []).map((label) => label?.id);
+  const version = Math.max(Date.parse(issue.updatedAt), Date.parse(issue.archivedAt) || 0);
+  if (!Number.isFinite(version) || typeof issue.identifier !== "string") {
+    throw new Error("Invalid feedback state");
+  }
+  // Automatic Linear archiving must not age old approved feedback off the board.
+  const manuallyArchived = issue.archivedAt && !issue.autoArchivedAt;
+  const visible =
+    issue.team?.id === env.FEEDBACK_TEAM_ID &&
+    !manuallyArchived &&
+    issue.labels.nodes.some((label) => label.id === env.FEEDBACK_LABEL_ID);
+  const status = visible
+    ? ({ unstarted: "pending", started: "review", completed: "done" }[issue.state.type] ?? "hidden")
+    : "hidden";
   return {
-    id: issue.identifier,
-    title: issue.title,
-    category: category(labelIds),
     status,
-    updatedAt: issue.updatedAt,
+    version,
+    identifier: issue.identifier,
+    inProgress: visible && issue.state.id === env.FEEDBACK_PROGRESS_STATE_ID,
   };
-}
-
-export function toBoard(nodes) {
-  const items = nodes
-    .map(toBoardItem)
-    .filter(Boolean)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  let done = 0;
-  // Done only grows; the column keeps the most recent items instead of the whole history.
-  return items.filter((item) => item.status !== "done" || ++done <= DONE_LIMIT);
-}
-
-export async function listFeedbackBoard(env) {
-  const data = await linear(env, LIST_ISSUES, {
-    team: env.FEEDBACK_TEAM_ID,
-    label: env.FEEDBACK_LABEL_ID,
-    types: TYPE_LABELS,
-  });
-  const open = data.open?.nodes;
-  const done = data.done?.nodes;
-  if (!Array.isArray(open) || !Array.isArray(done))
-    throw new Error("Linear returned no issue list");
-  return toBoard([...open, ...done]);
 }
 
 /**

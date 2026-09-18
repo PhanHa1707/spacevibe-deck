@@ -1,6 +1,6 @@
 /** Translated from `src-tauri/src/images.rs`. */
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readImageAsDataUrl, scanWorkspaceFavicon } from "./images";
@@ -97,5 +97,25 @@ describe("scanWorkspaceFavicon", () => {
 
   it("returns null for a folder with no favicon", async () => {
     await expect(scanWorkspaceFavicon(tempDir())).resolves.toBe(null);
+  });
+
+  // The rail scans every project it draws, so a repository must not be able to
+  // point a candidate at a file outside itself and get its bytes back.
+  it("refuses a candidate that links outside the workspace", async () => {
+    const dir = tempDir();
+    const outside = tempDir();
+    writeFileSync(join(outside, "secret.png"), "private");
+    symlinkSync(join(outside, "secret.png"), join(dir, "favicon.png"));
+
+    await expect(scanWorkspaceFavicon(dir)).resolves.toBe(null);
+  });
+
+  it("still reads a symlink that stays inside the workspace", async () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, "assets"));
+    writeFileSync(join(dir, "assets", "mark.png"), "x");
+    symlinkSync(join(dir, "assets", "mark.png"), join(dir, "favicon.png"));
+
+    await expect(scanWorkspaceFavicon(dir)).resolves.toContain("data:image/png");
   });
 });

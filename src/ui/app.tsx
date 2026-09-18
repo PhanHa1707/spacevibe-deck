@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "preact/hooks";
+import { AgentLaunchPage } from "../launcher/agent-launch-page";
+import { agentLaunchPage, agentLaunchPageAvailable } from "../launcher/agent-launch-page-store";
+import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import { useSignal, useSignalEffect } from "@preact/signals";
 import { quickAgentOptions } from "../settings/quick-agents";
 import { activeCategory } from "./settings/active-category-store";
@@ -270,10 +272,23 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
       // `syncViews` never runs for a file-only transition (spec §2.3's
       // seam) — this is how the file store tells `TabManager` to re-derive
       // the strip's status without either module knowing about the other.
+      beforeActivate: () => agentLaunchPage.close(),
+      canFocus: () => agentLaunchPage.request.value === null,
       onSurfacesChanged: () => tabsRef.current?.notifySurfacesChanged(),
     });
   }
   const fileController = fileControllerRef.current;
+  const agentPageOpen = agentLaunchPage.request.value !== null;
+  useLayoutEffect(() => {
+    const covered = [
+      ...document.querySelectorAll<HTMLElement>(".stage > .stage__tabs, .stage > .stage__surface"),
+    ];
+    for (const element of covered) element.inert = agentPageOpen;
+    return () => {
+      for (const element of covered) element.inert = false;
+    };
+  }, [agentPageOpen]);
+  useEffect(() => () => agentLaunchPage.close(), []);
   const updatePreview = resolveUpdatePreview(window.location.search, import.meta.env.DEV);
 
   if (updaterRef.current === null) {
@@ -319,6 +334,7 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
    */
   const requestAttentionFocus = (index?: number): void => {
     runAttentionFocus({
+      dismissAgentLauncher: () => agentLaunchPage.close(),
       tabIndex: index,
       hasCandidate: tabsRef.current?.hasActionableAttention(index) ?? false,
       overlays: {
@@ -367,6 +383,7 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
    */
   const focusRailPane = (index: number, paneId: number): void => {
     runAttentionFocus({
+      dismissAgentLauncher: () => agentLaunchPage.close(),
       tabIndex: index,
       hasCandidate: true,
       overlays: {
@@ -408,6 +425,14 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
    * it upward would widen that component's API for one focus call.
    */
   const restoreFocusAfterSettings = (): void => {
+    if (agentLaunchPage.request.value !== null) {
+      requestAnimationFrame(() =>
+        document
+          .querySelector<HTMLElement>(".agent-launch-page [data-launch-primary]:not(:disabled)")
+          ?.focus(),
+      );
+      return;
+    }
     if (boardOpen.value) {
       document.querySelector<HTMLElement>(".open-board")?.focus();
       return;
@@ -580,6 +605,7 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
       // browser surface here rather than passed bare — same seam, one more
       // occupant, TabManager untouched.
       surfaces: composeSurfaceStrip({
+        beforeActivate: () => agentLaunchPage.close(),
         files: fileController,
         client: defaultBrowserClient,
         onChanged: () => tabsRef.current?.notifySurfacesChanged(),
@@ -1196,6 +1222,7 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
 
   function openTaskBoard(): void {
     if (taskOperationPending.value === null) {
+      agentLaunchPage.close();
       boardOpen.value = true;
     }
   }
@@ -1212,6 +1239,11 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
    * old `null` branch had when no tab was active.
    */
   function openTaskLauncher(workspacePath: string | null): void {
+    if (agentLaunchPageAvailable && workspacePath !== null) {
+      if (agentLaunchPage.request.value !== null) agentLaunchPage.close(true);
+      else openAgentLaunchPage(workspacePath);
+      return;
+    }
     if (taskOperationPending.value !== null) {
       return;
     }
@@ -1232,6 +1264,60 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
     // re-derives its subject when the scan lands.
     ensureRepositoriesScanned([workspacePath]);
     railKeyboardMenuFor.value = workspacePath;
+  }
+
+  function openAgentLaunchPage(workspacePath: string): void {
+    if (
+      taskOperationPending.value !== null ||
+      settingsOpen.value ||
+      editorRequest.value !== null ||
+      saveDialogOpen.value ||
+      agentQuickPickerOpen.value ||
+      usageConsentOpen.value
+    )
+      return;
+    const manager = tabsRef.current;
+    const roots = () =>
+      [...repositoryScans.value.values()].flatMap((scan) =>
+        scan.kind === "repository" ? scan.worktrees.map((entry) => entry.path) : [],
+      );
+    const target = manager?.captureAgentLaunchTarget(workspacePath, roots());
+    if (!manager || !target) return;
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // The rail stays live behind the page, so a second checkout's `New agent`
+    // can reopen it. `boardOpen` was already cleared by the first open, which
+    // is why the debt is inherited from the outgoing request instead.
+    const returnToBoard = boardOpen.value || agentLaunchPage.request.value?.returnToBoard === true;
+    boardOpen.value = false;
+    railKeyboardMenuFor.value = null;
+    ensureRepositoriesScanned([workspacePath]);
+    agentLaunchPage.open({
+      target,
+      returnToBoard,
+      releaseStage: () => {
+        for (const element of document.querySelectorAll<HTMLElement>(
+          ".stage > .stage__tabs, .stage > .stage__surface",
+        ))
+          element.inert = false;
+      },
+      launch: (agentId, canCommit) =>
+        manager.launchAgentAtTarget(target, agentId, canCommit, roots),
+      reveal: (receipt, canFocus) =>
+        requestAnimationFrame(() => {
+          if (canFocus() && !settingsOpen.value && !boardOpen.value)
+            manager.focusAgentLaunch(receipt);
+        }),
+      restoreFocus: (canRestore) =>
+        requestAnimationFrame(() => {
+          if (!canRestore() || settingsOpen.value) return;
+          if (returnToBoard) {
+            boardOpen.value = true;
+            return;
+          }
+          if (trigger?.isConnected && !trigger.closest("[inert]")) trigger.focus();
+          else manager.focusActive();
+        }),
+    });
   }
 
   /** The live agent choices shared by both launcher surfaces. */
@@ -1337,6 +1423,7 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
     updateSettings({ sidebarCollapsed: !settings.value.sidebarCollapsed });
   };
   const selectTab = (index: number): void => {
+    agentLaunchPage.close();
     boardOpen.value = false;
     tabsRef.current?.selectTab(index);
   };
@@ -1415,6 +1502,7 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
    * wiring: a store-signal transition is invisible to `syncViews` otherwise.
    */
   const selectBrowserTab = (): void => {
+    agentLaunchPage.close();
     // One body for both chips (`takeStageForSurface`), because the asymmetry
     // is the defect: this one used to leave the Board on the stage, so a press
     // left both flags true and ⌘W closed the Board's chip while the user was
@@ -1437,6 +1525,7 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
    * TabManager-initiated paths.
    */
   const selectAgentBoardTab = (): void => {
+    agentLaunchPage.close();
     if (
       takeStageForSurface("agent-board", { files: fileController, client: defaultBrowserClient })
     ) {
@@ -1605,7 +1694,11 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
    * Only surfaces that COVER the pane belong here.
    */
   const overlayCoversPane = (): boolean =>
-    boardOpen.value || settingsOpen.value || editorRequest.value !== null || saveDialogOpen.value;
+    agentLaunchPage.request.value !== null ||
+    boardOpen.value ||
+    settingsOpen.value ||
+    editorRequest.value !== null ||
+    saveDialogOpen.value;
 
   /**
    * Close an ALREADY OPEN popover the moment an overlay opens over it —
@@ -1960,10 +2053,13 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
     // neither — it dropped the group — which is how the surface built to
     // launch agents came to offer none.
     agentsResolved: agentsProbed.value,
+    ...(agentLaunchPageAvailable ? { onOpenAgentLauncher: openAgentLaunchPage } : {}),
     onRunAgent: (agentId, workspacePath) => {
+      agentLaunchPage.close();
       void tabsRef.current?.openQuickAgent(agentId, workspacePath);
     },
     onOpenShell: (workspacePath) => {
+      agentLaunchPage.close();
       void tabsRef.current?.openQuickAgent(null, workspacePath);
     },
     onManageAgents: () => {
@@ -1971,6 +2067,7 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
       settingsOpen.value = true;
     },
     onSplitHere: (workspacePath) => {
+      agentLaunchPage.close();
       void tabsRef.current?.splitInWorkspace(workspacePath);
     },
     // Rendered by the FREE-STANDING placement only (`rail-create-consolidation`,
@@ -2014,11 +2111,19 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
       }
       sidebarToggle={
         railAvailable && !effectiveSidebarCollapsed() ? (
-          <SidebarFrameActions
-            collapsed={false}
-            disabled={taskOperationPending.value !== null}
-            onToggle={toggleSidebarCollapsed}
-            onOpenWorkspace={openTaskBoard}
+          <SidebarFrameActions collapsed={false} onToggle={toggleSidebarCollapsed} />
+        ) : null
+      }
+      // Sidebar layout keeps the frame row for the traffic lights and the
+      // sidebar identity: hide control, then the Deck brand (DL-18.9). The
+      // feature toolbar remains on the stage strip's trailing end, so it is
+      // not squeezed by the column's width and does not fold into `More` the
+      // moment that column narrows. Top-tab mode is unchanged: `TabBar` still
+      // mounts the same element.
+      toolbar={sidebar ? null : chromeActions}
+      sidebarNavigation={
+        railAvailable ? (
+          <AgentRail
             newPaneDrop={{
               // Read at pointer time, so the rects belong to whatever tab is on
               // the stage right now rather than to the one that was there when
@@ -2036,19 +2141,6 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
                 void tabsRef.current?.dropAgentPane(paneId, edge);
               },
             }}
-          />
-        ) : null
-      }
-      // Sidebar layout keeps the frame row for the traffic lights and the
-      // sidebar's leading controls: hide first, then `New` (DL-18.9). The
-      // feature toolbar remains on the stage strip's trailing end, so it is
-      // not squeezed by the column's width and does not fold into `More` the
-      // moment that column narrows. Top-tab mode is unchanged: `TabBar` still
-      // mounts the same element.
-      toolbar={sidebar ? null : chromeActions}
-      sidebarNavigation={
-        railAvailable ? (
-          <AgentRail
             // Hidden on the owner's ask (2026-08-17); `More` carries these rows
             // in both layouts while the flag is on. See `SIDEBAR_TOOLS_HIDDEN`.
             footer={SIDEBAR_TOOLS_HIDDEN ? undefined : railActions}
@@ -2083,6 +2175,8 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
       }
       topTabs={
         <TabBar
+          transientPageOpen={agentLaunchPage.request.value !== null}
+          onBeforeSelect={() => agentLaunchPage.close()}
           onSelectTab={selectTab}
           onCloseTab={closeTab}
           onCloseTabs={async (indexes) => (await tabsRef.current?.closeTabs(indexes)) ?? false}
@@ -2158,6 +2252,8 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
                 settingsOpen: settingsOpen.value,
               }) ? (
                 <TabStrip
+                  transientPageOpen={agentLaunchPage.request.value !== null}
+                  onBeforeSelect={() => agentLaunchPage.close()}
                   onSelectTab={selectTab}
                   onCloseTab={closeTab}
                   onCloseTabs={async (indexes) =>
@@ -2206,6 +2302,31 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
             />
           ) : null}
           <div class="stage__tabs" ref={stagesRef} />
+          {agentLaunchPage.request.value !== null && (
+            <AgentLaunchPage
+              target={agentLaunchPage.request.value.target}
+              agents={quickAgentOptions(launcherAgents(), settings.value.quickAgentIds)}
+              resolved={agentsProbed.value}
+              pending={agentLaunchPage.pending.value}
+              error={agentLaunchPage.error.value}
+              active={
+                !settingsOpen.value &&
+                !boardOpen.value &&
+                editorRequest.value === null &&
+                !saveDialogOpen.value &&
+                !agentQuickPickerOpen.value &&
+                !usageConsentOpen.value
+              }
+              onRun={(id) => {
+                void agentLaunchPage.run(id);
+              }}
+              onBack={() => agentLaunchPage.close(true)}
+              onSettings={() => {
+                activeCategory.value = "agents";
+                settingsOpen.value = true;
+              }}
+            />
+          )}
           {/* The document, on the stage rather than parked in the explorer
               panel (spec §4.2). It COVERS `.stage__tabs` instead of
               unmounting it: the terminal grid keeps its size, so taking the

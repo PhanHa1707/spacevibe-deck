@@ -1,6 +1,6 @@
 :root {
   /* Theme base vars — set from JS on theme change (app.tsx) */
-  --bg: #16161e;
+  --bg: #0a0a0a;
   --fg: #cbcbcb;
   --accent: #7aa2f7;
   --red: #f7768e;
@@ -21,7 +21,7 @@
      2026-08-19). These fallbacks are the dark branch, since a new install
      boots on deck-dark; JS replaces every one of them on first paint, and the
      light branch — where the columns still recede — only ever exists there. */
-  --sidebar-bg: color-mix(in srgb, var(--bg) 92%, var(--tone));
+  --sidebar-bg: #141414;
   --sidebar-seam: color-mix(in srgb, var(--sidebar-bg) 50%, var(--bg));
   --chrome-1: color-mix(in srgb, var(--sidebar-bg) 97%, var(--tone));
   --chrome-2: color-mix(in srgb, var(--sidebar-bg) 94%, var(--tone));

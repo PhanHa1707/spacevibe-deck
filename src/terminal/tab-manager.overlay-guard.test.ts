@@ -1,3 +1,4 @@
+import { agentLaunchPage } from "../launcher/agent-launch-page-store";
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Pane } from "./pane";
@@ -6,6 +7,7 @@ import { ACTION_REGISTRY } from "./action-registry";
 import {
   boardOpen,
   editorRequest,
+  railCardMenuOpen,
   saveDialogOpen,
   settingsOpen,
   shortcutCaptureActive,
@@ -83,6 +85,8 @@ vi.mock("../host/window-host", () => ({
 }));
 
 beforeEach(() => {
+  railCardMenuOpen.value = false;
+  agentLaunchPage.close();
   resetDesktopEnvironmentForTests();
   initializeDesktopEnvironment({
     platform: "macos",
@@ -549,5 +553,67 @@ describe("overlay scope guard — blocks terminal/tab/pane actions while an over
         // `open-tab-options` LEFT it on 2026-08-16 with `TabPopover` itself.
       ]),
     );
+  });
+});
+
+describe("transient agent launcher guards", () => {
+  it("yields Escape to a higher checkout menu", async () => {
+    const { tm } = setup({});
+    await tm.init();
+    agentLaunchPage.open({
+      target: { kind: "first-pane", workspacePath: "/repo" },
+      launch: async () => ({ kind: "cancelled" }),
+      restoreFocus: vi.fn(),
+      reveal: vi.fn(),
+    });
+    railCardMenuOpen.value = true;
+    const dismissMenu = (event: KeyboardEvent) => {
+      if (event.key === "Escape") railCardMenuOpen.value = false;
+    };
+    document.addEventListener("keydown", dismissMenu, true);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(railCardMenuOpen.value).toBe(false);
+    expect(agentLaunchPage.request.value).not.toBeNull();
+    document.removeEventListener("keydown", dismissMenu, true);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(agentLaunchPage.request.value).toBeNull();
+    tm.dispose();
+  });
+  it("blocks hidden pane actions and dismisses on native close without killing", async () => {
+    const { tm } = setup({});
+    await tm.openQuickAgent(null, "/repo");
+    const restoreFocus = vi.fn();
+    agentLaunchPage.open({
+      target: { kind: "split", tabKey: 1, paneId: 1, workspacePath: "/repo" },
+      launch: async () => ({ kind: "cancelled" }),
+      restoreFocus,
+      reveal: vi.fn(),
+    });
+    tm.runAction("split-row");
+    tm.runAction("close-tab");
+    await flush();
+    expect(tm.allPaneIds()).toEqual([1]);
+    tm.runAction("close-pane");
+    expect(agentLaunchPage.request.value).toBeNull();
+    expect(restoreFocus).toHaveBeenCalledOnce();
+    expect(tm.allPaneIds()).toEqual([1]);
+    tm.dispose();
+  });
+
+  it("does not dismiss the page through a higher Settings layer", async () => {
+    const { tm } = setup({});
+    agentLaunchPage.open({
+      target: { kind: "first-pane", workspacePath: "/repo" },
+      launch: async () => ({ kind: "cancelled" }),
+      restoreFocus: vi.fn(),
+      reveal: vi.fn(),
+    });
+    settingsOpen.value = true;
+    tm.runAction("close-pane");
+    tm.runAction("new-tab");
+    expect(agentLaunchPage.request.value).not.toBeNull();
+    settingsOpen.value = false;
+    agentLaunchPage.close();
+    tm.dispose();
   });
 });

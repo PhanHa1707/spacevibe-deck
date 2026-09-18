@@ -425,3 +425,35 @@ describe("createPaneLifecycle adopt and release", () => {
     expect(paneCwd(pane.id)).toBeNull();
   });
 });
+
+it("records genuine input only after its queued PTY write succeeds", async () => {
+  const onUserInput = vi.fn();
+  const writePty = vi.fn().mockResolvedValue(undefined);
+  const life = createPaneLifecycle({
+    pty: { ...createMemoryPtyClient({ nextId: 1 }), writePty },
+    getSettings: () => DEFAULT_SETTINGS as Settings,
+    onWriteWhileExited() {},
+    onFocus() {},
+    onUserInput,
+    createPane(id, _settings, events) {
+      return fakePane(id, events);
+    },
+  });
+  const pane = await life.spawnPane();
+  await life.paneEvents.onData(pane.id, "\x1b[1;1R");
+  expect(onUserInput).not.toHaveBeenCalled();
+  const release = life.holdWrites(pane.id);
+  const pending = life.paneEvents.onData(pane.id, "prompt", true);
+  await Promise.resolve();
+  expect(onUserInput).not.toHaveBeenCalled();
+  release();
+  expect(await pending).toBe(true);
+  expect(onUserInput).toHaveBeenCalledExactlyOnceWith(pane.id);
+  writePty.mockRejectedValueOnce(new Error("closed"));
+  expect(await life.paneEvents.onData(pane.id, "next", true)).toBe(false);
+  expect(onUserInput).toHaveBeenCalledTimes(1);
+  life.exited.add(pane.id);
+  expect(await life.paneEvents.onData(pane.id, "\r", true)).toBe(false);
+  expect(onUserInput).toHaveBeenCalledTimes(1);
+  life.killAll();
+});

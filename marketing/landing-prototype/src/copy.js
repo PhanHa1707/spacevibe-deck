@@ -33,10 +33,11 @@ export const messages = {
     feedbackIntro:
       "Hit a bug, or wish Deck did something new? Tell us. Accepted requests show up on the board and move along as we work on them.",
     feedbackTitleHint: "At least 3 characters",
-    feedbackSentBody: "Every note gets read. Once it has been reviewed, it shows up on the board.",
+    feedbackSentBody:
+      "Saved for review. We will email you when it is approved and when work starts.",
     feedbackSendAnother: "Send another",
     feedbackEmptyPending: "Nothing waiting right now.",
-    feedbackEmptyReview: "Nothing in review yet.",
+    feedbackEmptyReview: "Nothing in progress yet.",
     feedbackEmptyDone: "Finished requests land here.",
     feedbackFormTitle: "Send feedback",
     feedbackCategoryLabel: "Type",
@@ -51,13 +52,16 @@ export const messages = {
     feedbackSending: "Sending…",
     feedbackSent: "Thank you — it is in!",
     feedbackErrorInvalid: "Check the title (3–120 characters) and the details (up to 2,000).",
+    feedbackErrorAuth: "Sign in with Google again. Your draft has been kept.",
+    feedbackErrorConflict:
+      "This draft was already received with different details. Copy your edits before starting another report.",
     feedbackErrorRate: "Too many submissions right now. Try again in a minute.",
     feedbackErrorServer: "Could not send your feedback. Try again later.",
     feedbackNotice:
-      "Titles of accepted feedback are shown publicly. Leave out personal information.",
+      "After approval, your title, details and feedback type are public. Keep personal information out of your report. Your Google email stays private and receives approval and progress updates.",
     feedbackBoardTitle: "Board",
     feedbackColumnPending: "Pending",
-    feedbackColumnReview: "In review",
+    feedbackColumnReview: "In progress",
     feedbackColumnDone: "Done",
     feedbackLoading: "Loading the board…",
     feedbackError: "Could not load the board.",
@@ -162,10 +166,11 @@ export const messages = {
     feedbackIntro:
       "Gặp lỗi, hay muốn Deck làm thêm điều gì? Cứ kể cho chúng tôi. Góp ý được duyệt sẽ lên bảng và đi dần qua các cột theo tiến độ.",
     feedbackTitleHint: "Tối thiểu 3 ký tự",
-    feedbackSentBody: "Góp ý nào cũng được đọc. Sau khi duyệt, nó sẽ hiện trên bảng.",
+    feedbackSentBody:
+      "Saved for review. We will email you when it is approved and when work starts.",
     feedbackSendAnother: "Gửi thêm góp ý",
     feedbackEmptyPending: "Hiện chưa có gì đang chờ.",
-    feedbackEmptyReview: "Chưa có gì đang xem xét.",
+    feedbackEmptyReview: "Nothing in progress yet.",
     feedbackEmptyDone: "Việc đã xong sẽ nằm ở đây.",
     feedbackFormTitle: "Gửi góp ý",
     feedbackCategoryLabel: "Loại",
@@ -180,14 +185,18 @@ export const messages = {
     feedbackSubmit: "Gửi góp ý",
     feedbackSending: "Đang gửi…",
     feedbackSent: "Cảm ơn bạn — đã nhận!",
-    feedbackErrorInvalid: "Kiểm tra lại tiêu đề (3–120 ký tự) và phần chi tiết (tối đa 2.000 ký tự).",
+    feedbackErrorInvalid:
+      "Kiểm tra lại tiêu đề (3–120 ký tự) và phần chi tiết (tối đa 2.000 ký tự).",
+    feedbackErrorAuth: "Sign in with Google again. Your draft has been kept.",
+    feedbackErrorConflict:
+      "This draft was already received with different details. Copy your edits before starting another report.",
     feedbackErrorRate: "Đang có quá nhiều lượt gửi. Thử lại sau một phút.",
     feedbackErrorServer: "Không gửi được góp ý. Thử lại sau nhé.",
     feedbackNotice:
-      "Tiêu đề của góp ý đã duyệt sẽ hiển thị công khai. Đừng ghi thông tin cá nhân.",
+      "After approval, your title, details and feedback type are public. Keep personal information out of your report. Your Google email stays private and receives approval and progress updates.",
     feedbackBoardTitle: "Bảng tiến độ",
     feedbackColumnPending: "Đang chờ",
-    feedbackColumnReview: "Đang xem xét",
+    feedbackColumnReview: "In progress",
     feedbackColumnDone: "Đã xong",
     feedbackLoading: "Đang tải bảng…",
     feedbackError: "Không tải được bảng.",
@@ -195,7 +204,8 @@ export const messages = {
       "Sắp mở gửi góp ý. Những gì bạn viết ở đây được giữ lại trên máy này, nên lúc mở gửi nó vẫn còn nguyên.",
     feedbackSubmitClosed: "Sắp mở gửi",
     feedbackDraftSaved: "Đã lưu nháp trên máy này",
-    feedbackDraftRefused: "Trình duyệt này không cho lưu nháp. Hãy chép lại nội dung trước khi rời trang.",
+    feedbackDraftRefused:
+      "Trình duyệt này không cho lưu nháp. Hãy chép lại nội dung trước khi rời trang.",
     feedbackBoardSoon: "Bảng sẽ hiện khi mở gửi góp ý.",
     panelRestoreTitle: "Đóng rồi mở lại. Không mất mạch nào.",
     panelRestoreBody:

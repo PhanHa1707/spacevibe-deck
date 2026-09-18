@@ -23,6 +23,8 @@ import {
 export interface CodexScanOptions extends ScanOptions {
   readonly includeArchived: boolean;
   readonly interactiveOnly: boolean;
+  /** Live multi-lock pairing requires affirmative session_meta source evidence. */
+  readonly requireInteractiveSource?: boolean;
 }
 
 /**
@@ -124,6 +126,15 @@ export function readCodexRecord(
     return null;
   }
   const meta = payload as Record<string, unknown>;
+  if (
+    options.requireInteractiveSource &&
+    ((first as Record<string, unknown>).type !== "session_meta" ||
+      typeof meta.source !== "string" ||
+      meta.source === "" ||
+      isNonInteractiveSource(meta.source))
+  ) {
+    return null;
+  }
   if (options.interactiveOnly && isNonInteractiveSource(meta.source)) {
     return null;
   }

@@ -133,7 +133,8 @@ local agent storage.
 ## Built-in agents
 
 - **[Claude Code](https://claude.com/claude-code):** `claude --dangerously-skip-permissions`
-- **[Codex](https://developers.openai.com/codex/cli):** `codex --dangerously-bypass-approvals-and-sandbox`
+- **[Codex](https://developers.openai.com/codex/cli):** `codex --dangerously-bypass-approvals-and-sandbox -c tui.animations=false`
+  (the last flag stops Codex's idle animations from reading as a working agent)
 - **[OpenCode](https://opencode.ai):** `opencode`
 - **[Antigravity](https://antigravity.google):** `agy --dangerously-skip-permissions`
 - **[Gemini CLI](https://github.com/google-gemini/gemini-cli):** `gemini --yolo`

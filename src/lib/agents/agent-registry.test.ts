@@ -15,7 +15,9 @@ describe("agent registry", () => {
     expect(new Set(KNOWN_IDS).size).toBe(KNOWN_IDS.length);
     for (const agent of AGENT_DEFINITIONS) {
       expect((agent.defaultCommand ?? agent.id).split(" ")[0]).toBe(agent.id);
-      expect(agent.resume.bare).toBe(agent.id);
+      // The bare form may carry flags Deck always types (codex's
+      // `-c tui.animations=false`, DECK-121); the binary is still the id.
+      expect(agent.resume.bare.split(" ")[0]).toBe(agent.id);
     }
   });
 

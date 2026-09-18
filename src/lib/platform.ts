@@ -5,6 +5,7 @@ export type DesktopPlatform = "macos" | "windows" | "unsupported";
 export interface DesktopEnvironment {
   readonly platform: DesktopPlatform;
   readonly homeDir: string;
+  readonly isDevelopment?: boolean;
 }
 
 type ModifierEvent = Readonly<Pick<KeyboardEvent, "metaKey" | "ctrlKey">>;
@@ -47,7 +48,14 @@ export function parseDesktopEnvironment(value: unknown): DesktopEnvironment {
     const requirement = platform === "unsupported" ? "must be empty" : "must be an absolute path";
     throw new Error(`Desktop environment homeDir ${requirement}`);
   }
-  return Object.freeze({ platform, homeDir: value.homeDir });
+  if (value.isDevelopment !== undefined && typeof value.isDevelopment !== "boolean") {
+    throw new Error("Desktop environment isDevelopment must be a boolean");
+  }
+  return Object.freeze({
+    platform,
+    homeDir: value.homeDir,
+    ...(value.isDevelopment === undefined ? {} : { isDevelopment: value.isDevelopment }),
+  });
 }
 
 export function initializeDesktopEnvironment(value: unknown): DesktopEnvironment {

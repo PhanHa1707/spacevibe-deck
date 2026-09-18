@@ -143,7 +143,7 @@ function bare(color: string): string {
  */
 export function monacoThemeFor(settings: Settings): MonacoThemeData {
   const theme = resolveTheme(settings);
-  const background = theme.background ?? "#16161e";
+  const background = theme.background ?? "#0a0a0a";
   const foreground = theme.foreground ?? "#cbcbcb";
   const chrome = deriveChromeColors(background, foreground);
   const red = theme.red ?? "#f7768e";

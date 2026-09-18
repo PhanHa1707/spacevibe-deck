@@ -176,3 +176,78 @@ describe("createPtyInfoReader", () => {
     expect(infos[0]?.cwd).toBe("/fresh");
   });
 });
+
+describe("Codex session facts", () => {
+  const codexRows = (pid = 777) =>
+    parsePsTable(`610 610 ${pid} ttys002 zsh\n${pid} ${pid} ${pid} ttys002 codex`);
+  const panes = [snapshot(2, 610, "ttys002")];
+  it("does not block classification on lsof and surfaces a fact on the next poll", async () => {
+    let finish!: (value: Map<number, string>) => void;
+    const sessions = vi.fn(
+      () =>
+        new Promise<Map<number, string>>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const reader = createPtyInfoReader(
+      () => ({
+        readProcessTable: async () => codexRows(),
+        foregroundProcess,
+        processCwds: async () => new Map(),
+      }),
+      sessions,
+    );
+    expect((await reader.read(panes))[0].codexSessionId).toBeNull();
+    expect(sessions).toHaveBeenCalledWith([777]);
+    finish(new Map([[777, "own"]]));
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect((await reader.read(panes))[0].codexSessionId).toBe("own");
+  });
+  it("withdraws a previously verified identity when the same pid has no reliable lock reading", async () => {
+    const sessions = vi
+      .fn()
+      .mockResolvedValueOnce(new Map([[777, "own"]]))
+      .mockResolvedValue(new Map());
+    const reader = createPtyInfoReader(
+      () => ({
+        readProcessTable: async () => codexRows(),
+        foregroundProcess,
+        processCwds: async () => new Map(),
+      }),
+      sessions,
+    );
+    await reader.read(panes);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect((await reader.read(panes))[0].codexSessionId).toBe("own");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect((await reader.read(panes))[0].codexSessionId).toBeNull();
+  });
+
+  it("never applies an old pid's late lock reading to a new foreground process", async () => {
+    let pid = 777;
+    let finish!: (value: Map<number, string>) => void;
+    const sessions = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<Map<number, string>>((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockResolvedValue(new Map());
+    const reader = createPtyInfoReader(
+      () => ({
+        readProcessTable: async () => codexRows(pid),
+        foregroundProcess,
+        processCwds: async () => new Map(),
+      }),
+      sessions,
+    );
+    await reader.read(panes);
+    pid = 888;
+    expect((await reader.read(panes))[0].codexSessionId).toBeNull();
+    finish(new Map([[777, "stranger"]]));
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect((await reader.read(panes))[0].codexSessionId).toBeNull();
+  });
+});

@@ -306,10 +306,14 @@ function BareCheckout({
         type="button"
         class="asr-bare"
         data-shell="false"
-        aria-haspopup="menu"
-        aria-expanded={menu.rect !== null}
+        aria-haspopup={actions.onOpenAgentLauncher ? undefined : "menu"}
+        aria-expanded={actions.onOpenAgentLauncher ? undefined : menu.rect !== null}
         aria-label={`New agent in ${where}`}
         onClick={(event) => {
+          if (actions.onOpenAgentLauncher) {
+            actions.onOpenAgentLauncher(group.path);
+            return;
+          }
           menu.toggleAt(event.currentTarget.getBoundingClientRect(), event.currentTarget);
         }}
       >
@@ -372,9 +376,19 @@ function FlatEntries({
           <NewAgentRow
             where={whereOf(project, group)}
             open={menu.rect !== null}
+            opensPage={actions.onOpenAgentLauncher !== undefined}
             onPress={(row) => {
+              if (actions.onOpenAgentLauncher) {
+                actions.onOpenAgentLauncher(group.path);
+                return;
+              }
               menu.toggleAt(row.getBoundingClientRect(), row);
             }}
+            // This shape has no card box to right-click, so the create row is
+            // the anchor. Without it, a folder git does not know loses every
+            // pointer route to `Open shell` once the press opens the launch
+            // page instead of the menu.
+            onContext={(row) => menu.openAt(row.getBoundingClientRect())}
           />
           <CheckoutMenu project={project} group={group} actions={actions} menu={menu} />
         </Fragment>
@@ -471,22 +485,34 @@ function CheckoutMenu({
 function NewAgentRow({
   where,
   open,
+  opensPage = false,
   onPress,
+  onContext,
 }: {
   readonly where: string;
   readonly open: boolean;
+  readonly opensPage?: boolean;
   readonly onPress: (row: HTMLButtonElement) => void;
+  readonly onContext?: (row: HTMLButtonElement) => void;
 }) {
   return (
     <button
       type="button"
       class="asr-card__new"
-      aria-haspopup="menu"
-      aria-expanded={open}
+      aria-haspopup={opensPage ? undefined : "menu"}
+      aria-expanded={opensPage ? undefined : open}
       aria-label={`New agent in ${where}`}
       onClick={(event) => {
         onPress(event.currentTarget);
       }}
+      onContextMenu={
+        onContext === undefined
+          ? undefined
+          : (event) => {
+              event.preventDefault();
+              onContext(event.currentTarget);
+            }
+      }
     >
       <span class="asr-card__glyph asr-card__glyph--new" aria-hidden="true">
         <DeckIcon icon={Plus} size={CHROME_ICON} />
@@ -642,7 +668,12 @@ export function WorktreeCard(props: WorktreeCardProps) {
             <NewAgentRow
               where={whereOf(project, group)}
               open={menu.rect !== null}
+              opensPage={actions.onOpenAgentLauncher !== undefined}
               onPress={(row) => {
+                if (actions.onOpenAgentLauncher) {
+                  actions.onOpenAgentLauncher(group.path);
+                  return;
+                }
                 const card = cardRef.current;
                 menu.toggleAt(
                   card === null ? row.getBoundingClientRect() : card.getBoundingClientRect(),
@@ -659,10 +690,15 @@ export function WorktreeCard(props: WorktreeCardProps) {
           onFocusPane={props.onFocusPane}
           onClosePane={props.onClosePane}
           actionsOpen={menu.rect !== null}
+          opensPage={actions?.onOpenAgentLauncher !== undefined}
           onOpenActions={
             actions === undefined
               ? undefined
               : (trigger) => {
+                  if (actions.onOpenAgentLauncher) {
+                    actions.onOpenAgentLauncher(group.path);
+                    return;
+                  }
                   // Off the CARD's rect, not the `+`'s: both entry points must
                   // put the menu in the same place (spec §8.2).
                   const card = cardRef.current;

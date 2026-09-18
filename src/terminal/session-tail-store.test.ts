@@ -132,6 +132,92 @@ describe("session tail store", () => {
     vi.useRealTimers();
   });
 
+  it("Codex never requests a guessed tail, even with a resume mark", async () => {
+    noteResumedPane("/w", "codex");
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex" })])];
+    dispose = installSessionTailSync();
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    expect(hosts.sessionTails).not.toHaveBeenCalled();
+  });
+
+  it("Codex requests only its fact, including before the first prompt", async () => {
+    tabViews.value = [
+      tab(1, "/w", [
+        pane(101, {
+          agent: "codex",
+          hasRun: false,
+          sessionId: "own-thread",
+        }),
+      ]),
+    ];
+    dispose = installSessionTailSync();
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    expect(batchAt(0)[0]).toMatchObject({ preferredId: "own-thread", exact: true });
+    expect(paneTails.value.has(101)).toBe(false);
+  });
+
+  it("a fact immediately forgets a guessed pin even when its rollout is absent", async () => {
+    tabViews.value = [tab(1, "/w", [pane(101)])];
+    hosts.sessionTails.mockResolvedValue([pairing("stranger", "another conversation")]);
+    dispose = installSessionTailSync();
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    hosts.sessionTails.mockResolvedValue([null]);
+    tabViews.value = [tab(1, "/w", [pane(101, { sessionId: "own-thread" })])];
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    expect(batchAt(1)[0]).toMatchObject({ preferredId: "own-thread", exact: true });
+    expect(paneTails.value.has(101)).toBe(false);
+    expect(paneSessionIds.value.get(101)).not.toBe("stranger");
+  });
+
+  it("discards an in-flight answer after the pane's exact identity changes", async () => {
+    let answer!: (value: (SessionTailAnswer | null)[]) => void;
+    hosts.sessionTails.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    );
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex", sessionId: "old" })])];
+    dispose = installSessionTailSync();
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex", sessionId: "new" })])];
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    answer([pairing("old", "wrong reply")]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(paneTails.value.has(101)).toBe(false);
+    expect(batchAt(1)[0]).toMatchObject({ preferredId: "new", exact: true });
+  });
+
+  it("withdraws Codex text, model and pin without sending another request", async () => {
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex", sessionId: "own" })])];
+    hosts.sessionTails.mockResolvedValue([pairingWithModel("own", "my reply", "gpt")]);
+    dispose = installSessionTailSync();
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    expect(paneTails.value.get(101)).toBe("my reply");
+    let finish!: (value: (SessionTailAnswer | null)[]) => void;
+    hosts.sessionTails.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    tabViews.value = [
+      tab(1, "/w", [pane(101, { agent: "codex", sessionId: "own", changedAt: NOW + 1000 })]),
+    ];
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    tabViews.value = [
+      tab(1, "/w", [pane(101, { agent: "codex", sessionId: null, changedAt: NOW + 1000 })]),
+    ];
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    expect(paneTails.value.has(101)).toBe(false);
+    expect(paneModels.value.has(101)).toBe(false);
+    expect(paneSessionIds.value.has(101)).toBe(false);
+    finish([pairingWithModel("own", "late reply", "gpt")]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(paneTails.value.has(101)).toBe(false);
+    expect(hosts.sessionTails).toHaveBeenCalledTimes(2);
+  });
+
   it("1. fetches one tail per agent pane and publishes the answers by pane id", async () => {
     tabViews.value = [tab(1, "/w", [pane(101)])];
     hosts.sessionTails.mockResolvedValue(tails("writing the tests"));
@@ -209,7 +295,7 @@ describe("session tail store", () => {
 
   it("6. maps positional answers back to the right pane across tabs", async () => {
     tabViews.value = [
-      tab(1, "/a", [pane(101), pane(102, { agent: "codex" })]),
+      tab(1, "/a", [pane(101), pane(102, { agent: "codex", sessionId: "s2" })]),
       tab(2, "/b", [pane(201, { agent: "gemini" })]),
     ];
     hosts.sessionTails.mockResolvedValue(tails("one", "two", "three"));
@@ -219,7 +305,14 @@ describe("session tail store", () => {
 
     expect(batchAt(0)).toEqual([
       { agent: "claude", cwd: "/a", lastSeenAt: NOW, notBefore: NOW },
-      { agent: "codex", cwd: "/a", lastSeenAt: NOW, notBefore: NOW },
+      {
+        agent: "codex",
+        cwd: "/a",
+        lastSeenAt: NOW,
+        notBefore: NOW,
+        preferredId: "s2",
+        exact: true,
+      },
       { agent: "gemini", cwd: "/b", lastSeenAt: NOW, notBefore: NOW },
     ]);
     expect([...paneTails.value.entries()]).toEqual([
@@ -403,7 +496,7 @@ describe("session tail store", () => {
   });
 
   it("22. refetches when a pane's agent changes under an unmoved clock", async () => {
-    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex" })])];
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex", sessionId: "s1" })])];
     hosts.sessionTails.mockResolvedValue(tails("what codex said"));
     dispose = installSessionTailSync();
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
@@ -476,47 +569,47 @@ describe("session tail store — the fresh-pane floor", () => {
     // what keeps the ranking from answering with an older conversation in
     // the same directory: it is the store's own first sight of this agent
     // generation, taken while the pane was still skipped as never-run.
-    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex", hasRun: false })])];
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: "opencode", hasRun: false })])];
     dispose = installSessionTailSync();
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
     expect(hosts.sessionTails).not.toHaveBeenCalled();
 
     vi.setSystemTime(NOW + 4_000);
     tabViews.value = [
-      tab(1, "/w", [pane(101, { agent: "codex", hasRun: true, changedAt: NOW + 4_000 })]),
+      tab(1, "/w", [pane(101, { agent: "opencode", hasRun: true, changedAt: NOW + 4_000 })]),
     ];
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
 
     expect(batchAt(0)).toEqual([
-      { agent: "codex", cwd: "/w", lastSeenAt: NOW + 4_000, notBefore: NOW },
+      { agent: "opencode", cwd: "/w", lastSeenAt: NOW + 4_000, notBefore: NOW },
     ]);
   });
 
   it("F2. a resumed pane sends no floor — its conversation predates it by design", async () => {
-    noteResumedPane("/w", "codex");
-    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex", hasRun: false })])];
+    noteResumedPane("/w", "opencode");
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: "opencode", hasRun: false })])];
     hosts.sessionTails.mockResolvedValue(tails("what it said before the quit"));
 
     dispose = installSessionTailSync();
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
 
-    expect(batchAt(0)).toEqual([{ agent: "codex", cwd: "/w", lastSeenAt: NOW }]);
+    expect(batchAt(0)).toEqual([{ agent: "opencode", cwd: "/w", lastSeenAt: NOW }]);
     // And it stays unfloored on every later ask: the mark pins the pane for life.
     tabViews.value = [
-      tab(1, "/w", [pane(101, { agent: "codex", hasRun: true, changedAt: NOW + 9_000 })]),
+      tab(1, "/w", [pane(101, { agent: "opencode", hasRun: true, changedAt: NOW + 9_000 })]),
     ];
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
     expect(batchAt(1)).toEqual([
-      { agent: "codex", cwd: "/w", lastSeenAt: NOW + 9_000, preferredId: "s1" },
+      { agent: "opencode", cwd: "/w", lastSeenAt: NOW + 9_000, preferredId: "s1" },
     ]);
   });
 
   it("F3. a relaunch in the same pane moves the floor to the new generation", async () => {
-    // codex → shell → codex. `PaneView.startedAt` survives that round trip for
+    // opencode → shell → opencode. `PaneView.startedAt` survives that round trip for
     // Board uptime, which is exactly why the floor is NOT read from it: the
-    // second codex would inherit the first one's floor and the first one's
+    // second opencode would inherit the first one's floor and the first one's
     // conversation would pass it.
-    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex" })])];
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: "opencode" })])];
     hosts.sessionTails.mockResolvedValue(tails("first launch"));
     dispose = installSessionTailSync();
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
@@ -528,19 +621,19 @@ describe("session tail store — the fresh-pane floor", () => {
 
     vi.setSystemTime(NOW + 20_000);
     tabViews.value = [
-      tab(1, "/w", [pane(101, { agent: "codex", hasRun: false, changedAt: NOW + 20_000 })]),
+      tab(1, "/w", [pane(101, { agent: "opencode", hasRun: false, changedAt: NOW + 20_000 })]),
     ];
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
 
     vi.setSystemTime(NOW + 25_000);
     tabViews.value = [
-      tab(1, "/w", [pane(101, { agent: "codex", hasRun: true, changedAt: NOW + 25_000 })]),
+      tab(1, "/w", [pane(101, { agent: "opencode", hasRun: true, changedAt: NOW + 25_000 })]),
     ];
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
 
     expect(hosts.sessionTails).toHaveBeenCalledTimes(2);
     expect(batchAt(1)).toEqual([
-      { agent: "codex", cwd: "/w", lastSeenAt: NOW + 25_000, notBefore: NOW + 20_000 },
+      { agent: "opencode", cwd: "/w", lastSeenAt: NOW + 25_000, notBefore: NOW + 20_000 },
     ]);
   });
 });
@@ -763,6 +856,19 @@ describe("session tail store — lastSessionId", () => {
     await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
     expect(paneSessionIds.value.get(101)).toBe("sess-abc");
   }
+
+  it("preserves an exact id for Restart after an identified agent exits", async () => {
+    tabViews.value = [tab(1, "/w", [pane(101, { agent: "codex", sessionId: "own" })])];
+    hosts.sessionTails.mockResolvedValue([pairing("own", "my reply")]);
+    dispose = installSessionTailSync();
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    tabViews.value = [
+      tab(1, "/w", [pane(101, { agent: "codex", phase: "exited", sessionId: "own" })]),
+    ];
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    expect(lastSessionIdFor(101)).toBe("own");
+    expect(paneTails.value.has(101)).toBe(false);
+  });
 
   it("keeps the id when the agent leaves, and drops it when the pane does", async () => {
     await pairClaude();

@@ -5,6 +5,8 @@ import { DEFAULT_SETTINGS } from "../settings/settings-schema";
 const xterm = vi.hoisted(() => ({
   constructorOptions: undefined as Record<string, unknown> | undefined,
   opened: false,
+  key: (_event: { key: string }) => {},
+  data: (_data: string) => {},
 }));
 
 const webgl = vi.hoisted(() => ({
@@ -42,7 +44,12 @@ vi.mock("@xterm/xterm", () => ({
     onBell() {
       return { dispose() {} };
     }
-    onData() {}
+    onKey(callback: (event: { key: string }) => void) {
+      xterm.key = callback;
+    }
+    onData(callback: (data: string) => void) {
+      xterm.data = callback;
+    }
     onResize() {}
     getSelectionPosition() {
       return undefined;
@@ -100,7 +107,7 @@ vi.mock("./webkit-ime-fix", () => ({
   applyWebkitImeFix: vi.fn(),
   isWebKitWebView: () => false,
 }));
-vi.mock("./shift-enter", () => ({ installShiftEnterNewline: () => vi.fn() }));
+
 vi.mock("../settings/themes", () => ({ resolveTheme: () => ({}) }));
 vi.mock("./link-provider", () => ({ createLinkProvider: () => ({}) }));
 vi.mock("./osc-link-handler", () => ({ createOscLinkHandler: () => ({}) }));
@@ -275,4 +282,31 @@ describe("createPane renderer suspension", () => {
     pane.dispose();
     expect(webgl.instances[0].disposed).toBe(1);
   });
+});
+
+it("marks keyboard, browser paste, deferred IME and Shift+Enter as user input", async () => {
+  const onData = vi.fn(async () => true);
+  const pane = createPane(1, DEFAULT_SETTINGS, { ...events, onData });
+  const host = pane.element.querySelector(".pane__term")!;
+  xterm.key({ key: "a" });
+  xterm.data("a");
+  expect(onData).toHaveBeenLastCalledWith(1, "a", true);
+  xterm.data("\x1b[1;1R");
+  expect(onData).toHaveBeenLastCalledWith(1, "\x1b[1;1R", false);
+  host.dispatchEvent(new Event("paste", { bubbles: true }));
+  xterm.data("pasted text");
+  expect(onData).toHaveBeenLastCalledWith(1, "pasted text", true);
+  await Promise.resolve();
+  xterm.data("\x1b[1;1R");
+  expect(onData).toHaveBeenLastCalledWith(1, "\x1b[1;1R", false);
+  host.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "hello" }));
+  await Promise.resolve();
+  xterm.data("\x1b[1;1R");
+  expect(onData).toHaveBeenLastCalledWith(1, "\x1b[1;1R", false);
+  xterm.data("hello");
+  expect(onData).toHaveBeenLastCalledWith(1, "hello", true);
+  xterm.data("hello");
+  expect(onData).toHaveBeenLastCalledWith(1, "hello", false);
+  host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", shiftKey: true, bubbles: true }));
+  expect(onData).toHaveBeenLastCalledWith(1, "\x1b\r", true);
 });

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { build } from "esbuild";
 import { Miniflare } from "miniflare";
+import { createFeedbackRepository } from "./feedback-repository.mjs";
 import { createUsageRepository, RAW_RETENTION_MS } from "./usage-repository.mjs";
 
 test(
@@ -60,6 +61,38 @@ test(
     assert.equal(rows.results.length, 1);
     assert.deepEqual(JSON.parse(rows.results[0].agents), { claude: 3 });
     const repository = createUsageRepository(db);
+    const feedbackRepository = createFeedbackRepository(db);
+    const feedbackId = await feedbackRepository.create(
+      {
+        id: crypto.randomUUID(),
+        title: "Keep my feedback",
+        body: "Private until approved",
+        category: "idea",
+      },
+      { sub: "google-id", email: "sender@gmail.com" },
+    );
+    const moderation = {
+      status: "pending",
+      version: 1000,
+      identifier: "DECK-999",
+      inProgress: false,
+    };
+    await db
+      .prepare(
+        "CREATE TRIGGER refuse_feedback_mail BEFORE INSERT ON feedback_mail BEGIN SELECT raise(ABORT, 'refused'); END",
+      )
+      .run();
+    await assert.rejects(feedbackRepository.applyModeration(feedbackId, moderation));
+    assert.equal((await feedbackRepository.findById(feedbackId)).status, "private");
+    await db.prepare("DROP TRIGGER refuse_feedback_mail").run();
+    await feedbackRepository.applyModeration(feedbackId, moderation);
+    const feedbackResponse = await mf.dispatchFetch("https://api.deck.spacevibe.dev/v1/feedback");
+    assert.equal(feedbackResponse.status, 200);
+    assert.equal((await feedbackResponse.json()).items[0].description, "Private until approved");
+    const lease = await feedbackRepository.acquireLease(Date.now());
+    assert.ok(lease);
+    assert.equal(await feedbackRepository.acquireLease(Date.now()), null);
+    await feedbackRepository.releaseLease(lease);
 
     // `expire` puts the aggregate insert and the raw delete in one `db.batch`,
     // and the whole retention design rests on that being a transaction: if the
@@ -80,6 +113,7 @@ test(
 
     await repository.expire(Date.now() + RAW_RETENTION_MS);
     await repository.expire(Date.now() + RAW_RETENTION_MS);
+    assert.equal((await feedbackRepository.findById(feedbackId)).status, "pending");
     assert.equal((await db.prepare("SELECT count(*) AS n FROM usage_days").first()).n, 0);
     assert.equal(
       (await db.prepare("SELECT participating_installs AS n FROM usage_aggregates").first()).n,

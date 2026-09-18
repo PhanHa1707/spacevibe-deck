@@ -1,4 +1,6 @@
-import { FEEDBACK_PATH, handleFeedback } from "./feedback-routes.mjs";
+import { FEEDBACK_SYNC_CRON, syncFeedback } from "./feedback-sync.mjs";
+import { FEEDBACK_WEBHOOK_PATH, handleFeedbackWebhook } from "./feedback-webhook.mjs";
+import { FEEDBACK_PATH, FEEDBACK_CONFIG_PATH, handleFeedback } from "./feedback-routes.mjs";
 import { FEEDBACK_PROBE_CRON, probeFeedbackConfig } from "./linear-feedback.mjs";
 import { PayloadError, readPayload } from "./payload.mjs";
 import { createUsageRepository } from "./usage-repository.mjs";
@@ -12,7 +14,9 @@ const HEADERS = { "cache-control": "no-store", "x-content-type-options": "nosnif
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === FEEDBACK_PATH) return handleFeedback(request, env);
+    if (url.pathname === FEEDBACK_WEBHOOK_PATH) return handleFeedbackWebhook(request, env);
+    if (url.pathname === FEEDBACK_PATH || url.pathname === FEEDBACK_CONFIG_PATH)
+      return handleFeedback(request, env);
     if (url.pathname !== "/v1/ping") return new Response(null, { status: 404, headers: HEADERS });
     if (request.method !== "POST")
       return new Response(null, { status: 405, headers: { ...HEADERS, allow: "POST" } });
@@ -39,6 +43,10 @@ export default {
     }
   },
   async scheduled(controller, env) {
+    if (controller.cron === FEEDBACK_SYNC_CRON) {
+      await syncFeedback(env);
+      return;
+    }
     // The feedback probe has its own cron: its failure means "feedback is
     // broken", never "retention is overdue".
     if (controller.cron === FEEDBACK_PROBE_CRON) {

@@ -20,15 +20,19 @@ describe("buildResumeCommand — claude", () => {
 
 describe("buildResumeCommand — codex", () => {
   it("id ref", () => {
+    // Every Codex command Deck types carries `-c tui.animations=false`
+    // (DECK-121): the idle starfield otherwise reads as a working agent.
     expect(buildResumeCommand("codex", { kind: "id", id: "abc123" }, NO_CUSTOM)).toBe(
-      "codex resume abc123",
+      "codex resume abc123 -c tui.animations=false",
     );
   });
   it("latest ref", () => {
-    expect(buildResumeCommand("codex", { kind: "latest" }, NO_CUSTOM)).toBe("codex resume --last");
+    expect(buildResumeCommand("codex", { kind: "latest" }, NO_CUSTOM)).toBe(
+      "codex resume --last -c tui.animations=false",
+    );
   });
   it("null ref", () => {
-    expect(buildResumeCommand("codex", null, NO_CUSTOM)).toBe("codex");
+    expect(buildResumeCommand("codex", null, NO_CUSTOM)).toBe("codex -c tui.animations=false");
   });
 });
 

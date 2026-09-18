@@ -50,6 +50,7 @@ export interface AgentLauncherOptions {
   readonly platform?: DesktopPlatform;
   readonly timeoutMs?: number;
   readonly onTimeout?: (id: number) => void;
+  readonly onWriteFailure?: (id: number, error: unknown) => void;
   /**
    * The command for `id` has just been queued into its shell. `TabManager`
    * polls `pty_info` on it, at once and again a second later, so the
@@ -109,6 +110,11 @@ export function createAgentLauncher(
         state = { ...state, cancelled: addId(state.cancelled, id) };
       }
       console.error("agent launch write_pty failed:", err);
+      try {
+        options.onWriteFailure?.(id, err);
+      } catch (error) {
+        console.error("agent launch failure callback failed:", error);
+      }
     });
     try {
       onFire(id);

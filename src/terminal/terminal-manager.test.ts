@@ -164,6 +164,73 @@ function setup(emitFocusEvent = true): {
   };
 }
 
+describe("guarded launcher creation", () => {
+  it("preserves legacy docking onto an exited pane", async () => {
+    const { tm } = setup();
+    await tm.initFresh("/repo");
+    tm.handleExit(1);
+    expect(tm.isPaneLaunchable(1)).toBe(false);
+    expect(await tm.dockNewPaneAt(1, "right")).toBe(2);
+    expect(tm.paneIds()).toEqual([1, 2]);
+    tm.dispose();
+  });
+  it.each(["committed", "aborted"] as const)(
+    "refuses launch while transferring and follows %s outcome",
+    async (kind) => {
+      const pty = createMemoryPtyClient({ nextId: 1 });
+      const transfer = createMemoryTransferClient();
+      const manager = createTerminalManager(
+        document.createElement("div"),
+        { onLayoutChange() {} },
+        pty,
+        { createPane: (id, _settings, events) => fakePane(id, events), transfer },
+      );
+      await manager.initFresh("/repo", { focus: false });
+      expect(manager.isPaneLaunchable(1)).toBe(true);
+      const moving = manager.detachPaneById(1, { kind: "new-window" });
+      expect(manager.isPaneLaunchable(1)).toBe(false);
+      expect(
+        await manager.dockNewPaneAt(1, "right", { canCommit: () => true, cwd: "/repo" }),
+      ).toBeNull();
+      await vi.waitFor(() => expect(transfer.calls).toContain("await:xfer-1"));
+      transfer.settle(
+        "xfer-1",
+        kind === "committed" ? { kind } : { kind, reason: "Destination closed" },
+      );
+      await moving;
+      expect(manager.isPaneLaunchable(1)).toBe(kind === "aborted");
+      manager.dispose();
+    },
+  );
+
+  it("initializes without hidden focus and rejects cancelled initialization", async () => {
+    const { tm, onPaneFocus } = setup();
+    await tm.initFresh("/repo", { focus: false, canCommit: () => true });
+    expect(onPaneFocus).not.toHaveBeenCalled();
+    expect(tm.isPaneLaunchable(1)).toBe(true);
+    tm.dispose();
+    expect(tm.isPaneLaunchable(1)).toBe(false);
+    const other = setup();
+    await expect(other.tm.initFresh("/repo", { canCommit: () => false })).rejects.toThrow(
+      "Launch cancelled",
+    );
+    expect(other.tm.paneIds()).toEqual([]);
+    other.tm.dispose();
+  });
+
+  it("does not dock or focus when the request is cancelled", async () => {
+    const { tm, onPaneFocus } = setup();
+    await tm.initFresh("/repo");
+    onPaneFocus.mockClear();
+    expect(
+      await tm.dockNewPaneAt(1, "right", { cwd: "/repo", canCommit: () => false, focus: false }),
+    ).toBeNull();
+    expect(tm.paneIds()).toEqual([1]);
+    expect(onPaneFocus).not.toHaveBeenCalled();
+    tm.dispose();
+  });
+});
+
 beforeEach(() => {
   document.body.innerHTML = "";
 });

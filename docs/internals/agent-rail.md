@@ -54,6 +54,11 @@ The words (`failed`, `needs you`, `working`, `done`, `idle`) live only in the ro
 accessible name. Where attention and phase come from is in
 [terminal.md](terminal.md#agent-phase-and-attention).
 
+Codex's [output-timing fallback](../../src/terminal/agent-attention.ts) is armed only
+after genuine keyboard or paste [input](../../src/terminal/pane.ts) reaches the current
+agent generation. Launch commands and terminal capability replies do not arm it; explicit
+OSC and lifecycle reports remain authoritative.
+
 ## Agent usage and session re-entry
 
 The [sidebar summary](../../src/ui/usage/agent-usage-summary.tsx) replaces Unread
@@ -128,12 +133,30 @@ no-op, and the rail falls back to agent names.
 - **Only Claude Code, Codex and OpenCode produce a tail.** Gemini has no candidate scan,
   Antigravity's store is an undocumented protobuf, and custom agents are unknown. Those rows
   keep their agent name.
-- **A pane is asked about only once it has run something** (`hasRun`, or it was resumed), so a
-  fresh pane cannot wear a previous session's sentence. Requests are debounced 300ms on
-  `tabViews`, never on a timer.
+- **Codex panes are never ranked.** The [tail store](../../src/terminal/session-tail-store.ts)
+  requires a session-id fact and sends `preferredId` with `exact: true`; without a fact it
+  sends no request, even for a resumed pane. A missing rollout leaves the row blank.
+  A new fact discards any previous guessed pairing and its text, including late replies.
+- **Open writer locks identify Codex before its first prompt.** On Electron macOS/Linux,
+  [one background `lsof` batch](../../electron/platform/codex-thread-locks.ts) reads each
+  Codex foreground pid's open `~/.codex/thread-writer-locks/<thread-id>.lock` files.
+  One unique lock supplies the id. A process can also hold subagent locks: multiple locks
+  require exactly one matching rollout with an explicit interactive string `source`;
+  object-valued subagent sources and `exec` are excluded. Missing tools, unreadable metadata
+  or ambiguity yield no identity. This is an undocumented Codex internal; Windows supplies
+  no lock identity and Tauri has no implementation. The
+  [pty-info reader](../../electron/pty/info.ts) binds background results to the observed
+  process generation; the [client's availability gate](../../src/terminal/pty-client.ts)
+  and existing tracker carry the fact to the pane without inferring activity.
+- **Other agents can still use transcript ranking.** The
+  [store](../../src/terminal/session-tail-store.ts) asks after `hasRun`, a resume mark or an
+  exact fact. Fresh generations carry `notBefore`; the
+  [resolver](../../electron/resume/resolve.ts) drops older candidates. This floor only
+  narrows a guess. Exact pins bypass ranking, and resume marks omit the floor. Requests
+  are debounced 300ms on `tabViews`, never on a timer.
 - **The pane→session pairing is remembered and pinned.** A request carries `preferredId`,
   and `resolveSessionTails` runs two passes: every pin is honoured through
-  `findCandidateById` (no 30-day cutoff, no ranking) before any unpinned pane is ranked by
+  `findCandidateById` (no 30-day cutoff, no ranking) before any eligible, non-exact pane is ranked by
   mtime proximity through the same `selectCandidate` that session restore uses. The two
   passes exist because the earlier one-pass version let an unpinned pane earlier in the
   request take a later pane's pinned session, which is how three rows once printed the same
@@ -247,46 +270,30 @@ rather than inheriting a surface whose git and session sources it lacks.
 
 ## One create control per checkout
 
-The rail once spent five controls on "create" that did three different things, four of them
-spawning a plain shell with no word about where. **Pressing `+` opens the checkout menu;
-the destination is stated by position, never re-chosen**
-([action menu](../../src/ui/worktree-card-menus.tsx)).
+The checkout create controls open the Electron
+[agent launch page](../../src/launcher/agent-launch-page.tsx): the expanded `New agent`
+row, collapsed `+`, bare checkout and flat folder row share this route. A press creates
+nothing. `Run` splits right beside a captured pane in that checkout, or opens one first
+pane when it has no live tab. The page adds no task-strip item; Back and Escape restore
+the previous surface ([page state](../../src/launcher/agent-launch-page-store.ts)).
 
-- The project header's `+` and the tab strip's `+` are **gone in both layouts**. The open
-  card's `New agent` row, the bare row of a checkout with nothing open, a folder's flat
-  entries and the closed strip's `+` all raise the same actions menu
-  ([`useActionsMenu`](../../src/ui/worktree-card.tsx)); a press starts nothing.
-  The menu groups quick agents first and all other actions second, with a single
-  separator ([action groups](../../src/ui/worktree-card-menus.tsx)).
-  `Open shell` opens a new shell tab; selecting an agent launches it, and
-  `New split here` creates a shell pane. Up to five quick agents are selected in
-  [Settings](../../src/ui/settings/quick-agents-section.tsx). An unset selection uses
-  the first five available agents; an explicit empty selection stays empty.
-  Saved unavailable agents are omitted without substitution
-  ([selection model](../../src/settings/quick-agents.ts)).
-- **⌘T raises that same menu free-standing** under the stage strip, with a one-line
-  destination heading and an `Open another project…` row, built from a `MenuSubject` the
-  chord derives from the same scans the rail reads
-  ([`subjectForWorkspace`](../../src/ui/agent-rail-model.ts)). With no workspace it raises the
-  Open board. `TabManager.newTab()` is unchanged: `App` answers the chord through the
-  `railKeyboardMenuFor` signal rather than calling back into the tab layer, which is what
-  removes the recursion the deferred path had.
-- A **remembered** project prints its checkouts as rowless groups
-  ([`rememberedWorktrees`](../../src/ui/agent-rail-model.ts)) so their bare rows are its way
-  back in. The sidebar's own `+ New` is untouched.
-- **No new IPC.** Agent and shell rows use `openQuickAgent`, with `null` selecting a shell.
-  The folder row uses `open_in_app`; the external terminal row is absent
-  ([callbacks](../../src/ui/app.tsx)).
-  The one fork is [`splitInWorkspace`](../../src/terminal/tab-manager.ts): `split-row` acts on
-  the **active** pane and the card that raised the menu may not own it, so doing it honestly
-  is materialize-then-split, which is `TabManager`'s business. It takes a path and answers a
-  boolean, so no pane id leaves the terminal layer. An empty checkout materializes and stops —
-  a fresh tab's single pane *is* the pane the row promised.
-- Both surfaces are `position: fixed` over the stage, so `railCardMenuOpen` joined
-  `browserPanelObscured`: the browser's `WebContentsView` is a native layer above the
-  renderer and would otherwise cover the menu. The menu hangs to the **right** of the card,
-  because the rail is a column on the window's left edge and a menu below it would cover the
-  rail it was raised from.
+Right-click still raises the [checkout actions menu](../../src/ui/worktree-card-menus.tsx).
+Its quick agents open new tabs, `Open shell` opens a new shell tab and `New split here`
+creates a shell split, materializing one pane when no matching tab exists. The two menu
+groups and single separator remain. The page and menu use the same up-to-five
+[Quick agents selection](../../src/settings/quick-agents.ts): unset uses defaults, an
+explicit empty selection stays empty, and unavailable choices are omitted without
+replacement.
+
+Cmd/Ctrl+T opens or dismisses the page for the active workspace; without a workspace it
+opens the Open board. Frame New, dragging New onto a pane, and the Tauri menu fallback
+retain their existing paths ([entry routing](../../src/ui/app.tsx)). The project-header
+and task-strip create buttons remain absent.
+
+The native browser is obscured while the page or a rail menu covers its stage.
+[App](../../src/ui/app.tsx) retains the underlying terminal DOM and makes covered stage
+content inert, so opening the launcher neither resizes nor stops a terminal. Right-click
+menus keep their fixed placement beside the rail card.
 
 ## Other surfaces in the column
 

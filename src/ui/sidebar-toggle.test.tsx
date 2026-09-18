@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
 import { render } from "preact";
+import deckLogoUrl from "../../.github/assets/icon.svg";
 import { act } from "preact/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SidebarFrameActions, SidebarToggle } from "./sidebar-toggle";
+import { SidebarFrameActions, SidebarNewButton, SidebarToggle } from "./sidebar-toggle";
+import { initializeDesktopEnvironment, resetDesktopEnvironmentForTests } from "../lib/platform";
+import { appVersion } from "../updater/app-version";
 
 describe("SidebarToggle", () => {
   let host: HTMLDivElement;
 
   beforeEach(() => {
+    resetDesktopEnvironmentForTests();
+    appVersion.value = "";
     host = document.createElement("div");
     document.body.appendChild(host);
   });
@@ -15,6 +20,8 @@ describe("SidebarToggle", () => {
   afterEach(() => {
     act(() => render(null, host));
     host.remove();
+    resetDesktopEnvironmentForTests();
+    appVersion.value = "";
   });
 
   function control(): HTMLButtonElement {
@@ -64,44 +71,47 @@ describe("SidebarToggle", () => {
     expect(control().getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("puts New immediately after the open-sidebar toggle", () => {
-    const onOpenWorkspace = vi.fn();
-    act(() =>
-      render(
-        <SidebarFrameActions
-          collapsed={false}
-          onToggle={vi.fn()}
-          onOpenWorkspace={onOpenWorkspace}
-        />,
-        host,
-      ),
-    );
+  it("pairs the collapse control with Deck branding", () => {
+    act(() => render(<SidebarFrameActions collapsed={false} onToggle={vi.fn()} />, host));
+    expect(control().getAttribute("aria-label")).toBe("Collapse the sidebar");
+    expect(host.querySelector(".sidebar-brand")?.textContent).toBe("Deck");
+    expect(host.querySelector(".sidebar-brand img")?.getAttribute("src")).toBe(deckLogoUrl);
+    expect(host.querySelector(".sidebar-new")).toBeNull();
+  });
 
-    const actions = host.querySelector(".sidebar-frame-actions")!;
-    expect(Array.from(actions.children).map((child) => child.getAttribute("aria-label"))).toEqual([
-      "Collapse the sidebar",
-      "New",
-    ]);
-
+  it("shows DEV for a local build even before the version loads", () => {
+    initializeDesktopEnvironment({ platform: "macos", homeDir: "/Users/dev", isDevelopment: true });
+    act(() => render(<SidebarFrameActions collapsed={false} onToggle={vi.fn()} />, host));
+    expect(host.querySelector(".sidebar-brand__dev")?.textContent).toBe("DEV");
     act(() => {
-      host.querySelector<HTMLButtonElement>(".sidebar-new")!.click();
+      appVersion.value = "43.3.0";
     });
+    expect(host.querySelector(".sidebar-brand__dev")?.textContent).toBe("DEV");
+    expect(host.querySelector(".sidebar-brand__version")).toBeNull();
+  });
+
+  it("keeps the version label for a packaged build", () => {
+    initializeDesktopEnvironment({
+      platform: "macos",
+      homeDir: "/Users/dev",
+      isDevelopment: false,
+    });
+    appVersion.value = "1.2.0";
+    act(() => render(<SidebarFrameActions collapsed={false} onToggle={vi.fn()} />, host));
+    expect(host.querySelector(".sidebar-brand__dev")).toBeNull();
+    expect(host.querySelector(".sidebar-brand__version")?.textContent).toBe("V1.2.0");
+  });
+
+  it("opens the workspace from the standalone launcher", () => {
+    const onOpenWorkspace = vi.fn();
+    act(() => render(<SidebarNewButton onOpenWorkspace={onOpenWorkspace} />, host));
+    act(() => host.querySelector<HTMLButtonElement>(".sidebar-new")!.click());
     expect(onOpenWorkspace).toHaveBeenCalledTimes(1);
   });
 
   it("disables New while another task operation is in flight", () => {
     const onOpenWorkspace = vi.fn();
-    act(() =>
-      render(
-        <SidebarFrameActions
-          collapsed={false}
-          disabled
-          onToggle={vi.fn()}
-          onOpenWorkspace={onOpenWorkspace}
-        />,
-        host,
-      ),
-    );
+    act(() => render(<SidebarNewButton disabled onOpenWorkspace={onOpenWorkspace} />, host));
 
     const button = host.querySelector<HTMLButtonElement>(".sidebar-new");
     expect(button?.disabled).toBe(true);

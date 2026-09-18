@@ -42,10 +42,27 @@ function setup() {
 }
 
 describe("Codex lifecycle", () => {
+  it.each(["new", null])(
+    "preserves new-session hooks before PID refresh with lock %s",
+    (lockId) => {
+      const { tracker, send } = setup();
+      tracker.noteProcessSession(1, 42, "old");
+      send("SessionStart", "turn-1", "new");
+      send("UserPromptSubmit", "turn-1", "new");
+      tracker.noteProcessSession(1, 43, lockId);
+      expect(tracker.snapshot(1)).toMatchObject({
+        phase: "working",
+        phaseConfidence: "explicit",
+        hasRun: true,
+        sessionId: "new",
+      });
+    },
+  );
+
   it("keeps a resumed session idle before its first prompt, including late startup repaint", () => {
     const { tracker, send, redraw, advance } = setup();
     redraw();
-    expect(tracker.snapshot(1)?.phase).toBe("working");
+    expect(tracker.snapshot(1)?.hasRun).toBe(false);
     send("SessionStart");
     expect(tracker.snapshot(1)).toMatchObject({
       phase: "idle",
@@ -74,9 +91,10 @@ describe("Codex lifecycle", () => {
     expect(tracker.snapshot(1)).toMatchObject({ phase: "idle", attention: "none", hasRun: true });
   });
 
-  it("withdraws inferred startup completion without acknowledging unseen output", () => {
+  it("withdraws inferred completion from prior input without acknowledging unseen output", () => {
     const { tracker, send, redraw } = setup();
     tracker.noteOutputVisibility(1, false);
+    tracker.noteInput(1);
     redraw();
     tracker.noteActivity(1, {
       phase: "idle",
@@ -101,12 +119,18 @@ describe("Codex lifecycle", () => {
     send("SessionStart");
     tracker.releaseCodexLifecycle();
     redraw();
+    expect(tracker.snapshot(1)?.hasRun).toBe(false);
+    tracker.noteInput(1);
+    redraw();
     expect(tracker.snapshot(1)?.phase).toBe("working");
     send("SessionStart");
     tracker.noteExit(1, 0);
     send("SessionStart");
     expect(tracker.snapshot(1)?.phase).toBe("exited");
     tracker.noteProcess(1, "codex", true);
+    redraw();
+    expect(tracker.snapshot(1)?.hasRun).toBe(false);
+    tracker.noteInput(1);
     redraw();
     expect(tracker.snapshot(1)?.phase).toBe("working");
   });

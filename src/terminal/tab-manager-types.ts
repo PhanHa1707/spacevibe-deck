@@ -1,3 +1,8 @@
+import type {
+  AgentLaunchTarget,
+  AgentLaunchResult,
+  AgentLaunchReceipt,
+} from "./agent-launch-target";
 import type { Direction, Edge, SerializedNode } from "../lib/split-tree";
 import type { PaneRect } from "../lib/pane-geometry";
 import type { SessionTab } from "../lib/session-schema";
@@ -134,6 +139,17 @@ export interface TabManagerDeps extends TerminalManagerDeps {
 
 /** Owns all tabs: routing, keyboard, agent launch; info polling lives in PaneInfoPoller. */
 export interface TabManager {
+  captureAgentLaunchTarget(
+    workspacePath: string,
+    checkoutRoots?: readonly string[],
+  ): AgentLaunchTarget | null;
+  launchAgentAtTarget(
+    target: AgentLaunchTarget,
+    agentId: string,
+    canCommit: () => boolean,
+    checkoutRoots?: () => readonly string[],
+  ): Promise<AgentLaunchResult>;
+  focusAgentLaunch(receipt: AgentLaunchReceipt): void;
   /** Install listeners + start polling. The app always opens on the board. */
   init(): Promise<void>;
   /** Materialize one tab from a MaterializeIntent (Open / Closed / preset). */
