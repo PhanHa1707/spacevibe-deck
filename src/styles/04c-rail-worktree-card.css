@@ -138,7 +138,11 @@ button.asr-bare:hover {
    `Badge` takes its class from the caller rather than hardcoding one (`worktree-card.tsx`).
    `max-width` is what keeps a long branch from starving the name beside it: a real branch
    (`feature/ai-terminal`) is wider than the name at rail width, and the badge is the one that
-   can truncate without losing the row's identity. */
+   can truncate without losing the row's identity. A 132px cap was not enough for that on a
+   CARD (design review 2026-09-18, F2/L8): the head's `auto` badge column was sized first, so
+   `redesign` printed as `redesi…` beside a whole `redesign/phase-1-2`. The card's badge now
+   caps at 96px and the head grid gives the name a floor (below); the bare row keeps 132px,
+   since its name has no branch competing for the line. */
 .asr-card__badge,
 .asr-bare__badge {
   display: grid;
@@ -259,13 +263,15 @@ button.asr-bare:hover {
 /* ---------------------------------------------------------------------- the head */
 
 /* DL-27.25: a fixed trailing caret makes disclosure visible without shifting the name
-   or badge on hover. Age and count stay below this button. */
+   or badge on hover. Age and count stay below this button. The name track has a 7ch
+   floor and the badge track is `minmax(0, auto)` (2026-09-18, F2/L8): with a plain `auto`
+   the badge took its full width first and the checkout's own name was what ellipsized. */
 .asr-card__head {
   display: grid;
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  grid-template-columns: 14px minmax(0, 1fr) auto 13px;
+  grid-template-columns: 14px minmax(7ch, 1fr) minmax(0, auto) 13px;
   align-items: center;
   column-gap: 6px;
   min-height: 24px;
