@@ -2877,6 +2877,36 @@ a 1.5s effect. The ping is the inset hairline DL-1.3 explicitly permits.
   Electron-only; [`AgentRail`](../src/ui/agent-rail.tsx) `current` routes Tauri
   to the legacy [`RepositoryRail`](../src/ui/repository-rail.tsx) `current`.
 
+  **Amended 2026-09-18 (owner, design review L1): a card is OPEN by default.**
+  Until then every card started closed and stayed closed across relaunches
+  (the open set was window-local and unpersisted), so the rail at rest was
+  glyph segments, `×N`, `+N` and an age — thirteen seeded panes and not one
+  word of what any agent said, while the landing promised that "each agent's
+  row carries the last thing it actually said". The disclosure is now a FOLD
+  the user makes: `foldedCardKeys` in [`AgentRail`](../src/ui/agent-rail.tsx)
+  is empty at launch and a head press adds to it. Still window-local and
+  unpersisted, for the 2026-08-26 reason (settings are app-level). The closed
+  strip, its segments, `+N` and `+` are unchanged; they are what a folded card
+  shows. The same review's F2/L8 fixed the head grid so a branch badge no
+  longer starves the checkout's own name: the name track has a 7ch floor, the
+  badge track is `minmax(0, auto)` and the card's badge caps at 96px
+  ([head styles](../src/styles/04c-rail-worktree-card.css)); the bare row
+  keeps 132px.
+
+- **DL-27.26** **One `Needs me N` line above the clusters (2026-09-18, design
+  review L5).** The rail owns the question "which agent needs me" and answers
+  it once, at the top: a count of the panes in `asked` or `failed` across every
+  card, folded or not, drawn only while it is above zero. Pressing it runs the
+  same preflight as ⌘⇧A (`focus-next-attention`) and lands on the loudest
+  pane. It is a flat pill in the Board bar's chip vocabulary (DL-34.11): a
+  `--status-unread` wash inside DL-1.3's inset hairline, the count at
+  `--text-primary` 620 and the label at `--text-muted`, sharing the cluster
+  header's 7px inset. Strip glyphs keep their corner marks (DL-27.3) and never
+  carry a count; the Board bar's own `Needs me` filter (DL-34.11) is the same
+  figure on the other surface. Rendered as a still `<span>` where nothing
+  wires the focus (DL-19.7). [Rail styles](../src/styles/04a-agent-rail.css),
+  [`AgentRail`](../src/ui/agent-rail.tsx).
+
   **Amended 2026-09-02 (owner, `openspec/changes/rail-create-consolidation`):
   every checkout carries exactly ONE create control, and it opens the agent
   list.** The open card's `New agent` row and the bare row of a checkout with
@@ -3370,10 +3400,14 @@ Numbered 34 because §33 was the previous highest rule.
   `--radius-control`.
   **Four groups:** status, identity, what-the-agent-said and footer.
   The [card](../src/ui/agent-board-card.tsx) identifies the agent by a 17px
-  logo (or its letter fallback), beside the repo name at `--type-title`
-  (14px). The worktree label shares the status row with the ordinal; it
-  truncates before displacing the ordinal. The agent name remains in
-  accessible labels only. The identity starts 8px below
+  logo (or its letter fallback), beside `agent · checkout` at `--type-title`
+  (14px). **Amended 2026-09-18 (owner, design review L3):** that line printed
+  the repo name until then, so every card of one repository read the same
+  and only the 17px logo told Claude from Codex — and nothing told Claude
+  from Claude 2 but the rank. The project moved to the pill that shares the
+  status row with the ordinal; it truncates before displacing the ordinal.
+  The agent name is now on the card as well as in the accessible label.
+  The identity starts 8px below
   status, with 11px before the message and footer, as defined in the
   [card styles](../src/styles/19-agent-board.css). **What the agent said is
   the subject**: it takes `--text-primary` (it shared `--text-muted` with the
