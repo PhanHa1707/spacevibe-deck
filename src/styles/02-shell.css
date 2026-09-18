@@ -173,13 +173,10 @@
 .window--sidebar > .stage {
   grid-column: 2;
   grid-row: 1 / 3;
-  /* No line here since 2026-09-18 (owner). It used to be the one structural
-     line in the shell, and it earned that while it separated `--sidebar-bg`
-     from the stage's `--bg`. DL-18.12's gutter paints `--sidebar-bg` on the
-     stage side too, so the same 1px now runs between two IDENTICAL surfaces —
-     a drawn line with no background step behind it, which is exactly what
-     DL-2.3 forbids. The rail and the gutter read as one chrome plane and the
-     pane's own `--seam-split` border is the boundary the eye needs. */
+  /* The one structural line in the shell, and it is vertical now. It lives on
+     the stage rather than on the rail because it has to run the frame's full
+     height too, and the frame is a sibling of the rail, not its parent. */
+  border-left: 1px solid var(--sidebar-seam);
 }
 
 .window--sidebar > .status {
