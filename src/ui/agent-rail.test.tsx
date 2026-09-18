@@ -435,9 +435,11 @@ describe("AgentRail click contract", () => {
     await settle();
 
     expect(host.querySelector(".asr-card")).not.toBeNull();
+    // The card is open by default (DL-27.25, amended 2026-09-18), so no head
+    // press happens here and the row is reachable without one; the head's own
+    // press-to-focus contract is `worktree-card.test.tsx`'s.
     openAllCards();
-    expect(onSelectTab).toHaveBeenCalledExactlyOnceWith(0);
-    onSelectTab.mockClear();
+    expect(onSelectTab).not.toHaveBeenCalled();
     const shell = host.querySelector<HTMLElement>('.asr-card__row[data-kind="shell"]');
     expect(shell).not.toBeNull();
     click(shell?.querySelector(".asr-card__hit"));
