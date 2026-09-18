@@ -1,5 +1,16 @@
 /* ── Stage (terminal area) ───────────────────────────────── */
 
+/* The gutter the pane-card geometry is derived from (owner, 2026-09-18):
+   4px on every stage edge AND between panes. On `:root` and not on `.stage`
+   because `.pane` and `.split__divider` are also mounted outside a stage — the
+   gallery's seam specimens do exactly that. The matching 6px corner is
+   DL-20.1's `--radius-tab` spelled at each use site rather than aliased here:
+   `design-language.test.ts` reads the literal role names out of the
+   stylesheet, so an alias would read as a radius picked by feel. */
+:root {
+  --stage-gutter: 4px;
+}
+
 .stage {
   position: relative;
   min-height: 0;
@@ -12,14 +23,20 @@
 .stage__tabs {
   position: absolute;
   inset: 0;
-  /* No gutter (owner, 2026-08-17). The 8px this used to carry pushed the pane
-     grid in from every edge, so the vertical split divider started 8px BELOW
-     the tab strip's bottom hairline and the two lines never met — a gap nobody
-     noticed while the divider was 3% and impossible to miss at 12%. Panes are
-     full-bleed now: the split lines run into the strip's line, and the stage
-     reads as one ruled surface instead of a card floating in the window. */
-  padding: 0;
+  /* A gutter on all four edges again (owner, 2026-09-18), replacing the
+     full-bleed grid of 2026-08-17: panes are rounded CARDS floating on the
+     gutter's chrome, so the stage no longer reads as one ruled surface and the
+     split lines no longer have to meet the strip's hairline — the whole reason
+     the 8px gutter was removed. 4px, not the old 8px, so the terminal keeps
+     its columns. */
+  padding: var(--stage-gutter);
   display: flex;
+  /* The gutter has to be a DIFFERENT surface from the pane or the radius is
+     invisible: the pane background and `.stage` are both `--bg`. `--sidebar-bg`
+     is the chrome the rail already paints (DL-18.7), and
+     `derive-colors.test.ts` guarantees it never collapses into `--bg` in any
+     theme. */
+  background: var(--sidebar-bg);
 }
 
 /* ── DL-18.6: the stage's tab strip (sidebar layout only) ─────────────────
@@ -204,15 +221,34 @@
      must still cover the document: the open board (30), Settings (35), the
      modal tier (40) and the popovers (100+). */
   z-index: 20;
-  /* Whatever gutter `.stage__tabs` gives its panes — none, since 2026-08-17 —
-     so the document lands on exactly the rectangle the terminal was occupying
-     instead of shifting by a gutter when the stage changes hands. Both values
-     move together or the handover jumps. */
-  padding: 0;
+  /* Whatever gutter `.stage__tabs` gives its panes — `--stage-gutter` since
+     2026-09-18 — so the document lands on exactly the rectangle the terminal
+     was occupying instead of shifting by a gutter when the stage changes
+     hands. Both values move together or the handover jumps, and the gutter
+     surface has to match for the same reason. */
+  padding: var(--stage-gutter);
   display: flex;
   min-width: 0;
   min-height: 0;
-  background: var(--bg);
+  background: var(--sidebar-bg);
+}
+
+/* The document is a card on the gutter like a pane is, so the handover does
+   not change the shape of the rectangle. Named children, not `> *`: the
+   markdown view-mode toggle is also a direct child and it is a CONTROL, which
+   keeps its own DL-20.1 role. Radius only, no clipping: Monaco's suggest and
+   hover widgets live inside the editor and an `overflow` here would cut them
+   off. */
+.stage__surface > .fileview,
+.stage__surface > .browser-panel,
+.stage__surface > .agent-board {
+  border-radius: var(--radius-tab);
+  /* The pane's edge, for the pane's reason — see `.pane` below. This outranks
+     `.fileview`'s own `--hair` border (`11-settings-screen.css`) only while
+     the file view IS the stage's card; inside the settings screen it stays a
+     line within a surface, which is what `--hair` is for. */
+  border: 1px solid var(--seam-split);
+  box-sizing: border-box;
 }
 
 .stage--strip .stage__surface {
@@ -223,11 +259,13 @@
   right: var(--dock-w);
 }
 
-/* The browser variant of the surface: the native view meets the stage's
-   edges — a web page brings its own margins, unlike the editor the 8px
-   gutter was measured for. */
+/* The browser variant keeps the gutter the base rule gives it (2026-09-18):
+   a page floating on the chrome like every other card is worth more than the
+   few pixels a web page's own margins duplicate. The corners of the web
+   content stay SQUARE and that is accepted — the content is a native view the
+   host positions over `.browser-panel__view`, and CSS cannot round it. */
 .stage__surface--browser {
-  padding: 0;
+  padding: var(--stage-gutter);
 }
 
 /* ── Browser surface: the browser tab's stage cover (DL-18.8) ────────────
@@ -243,6 +281,9 @@
   min-width: 0;
   min-height: 0;
   background: var(--bg);
+  /* The radius comes from `.stage__surface > *`; this is what makes the URL
+     bar's own edges follow it instead of squaring off the top corners. */
+  overflow: hidden;
 }
 
 .browser-panel__bar {
@@ -318,7 +359,9 @@
   inset: 0;
   display: flex;
   z-index: 10;
-  background: var(--bg);
+  /* The gutter's surface, not `--bg`: the zoomed pane is a card on the same
+     chrome as an unzoomed one, so its corners still read as corners. */
+  background: var(--sidebar-bg);
 }
 
 .tab-stage > * {
@@ -365,14 +408,19 @@
   transition: none;
 }
 
-/* A 2px seam between panes — no gap. `--seam-split`, not `--seam-divider`:
-   the owner asked for a heavier split on 2026-09-11 (DL-2.3), and the strip's
-   bottom edge keeps the lighter line. The grab zone is widened past the
-   visible line with a pseudo-element so a thin line stays easy to drag. */
+/* A `--stage-gutter` GAP between panes since 2026-09-18, replacing the 2px
+   `--seam-split` line of 2026-09-11: two rounded cards separated by the
+   gutter's chrome need no drawn seam, and a line plus a gap would read as
+   three surfaces. The divider element stays — it IS the gap, so it keeps
+   owning the drag — and paints nothing until hover. Its grab zone is still
+   widened past its own width with a pseudo-element. */
 .split__divider {
   position: relative;
-  flex: 0 0 2px;
-  background: var(--seam-split);
+  flex: 0 0 var(--stage-gutter);
+  background: transparent;
+  /* The sidebar grip's shape, for the same reason it has it: a 4px accent
+     reads as a bar, and a bar takes DL-20.1's 2px detail corner. */
+  border-radius: var(--radius-flat);
   transition: background var(--duration) var(--ease);
 }
 
@@ -396,9 +444,13 @@
   inset: -3px 0;
 }
 
+/* Full `--accent`, up from a 60% mix (owner, 2026-09-18): the sidebar grip and
+   this divider are now the same object — a 4px chrome gutter between two
+   `--bg` cards — and the 60% was justified by a difference between them that
+   no longer exists (DL-18.9). One idiom, one value. */
 .split__divider:hover,
 .split__divider.is-dragging {
-  background: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: var(--accent);
 }
 
 /* While dragging a divider, block mouse events on terminals so text is not selected */
@@ -415,6 +467,11 @@
   position: relative;
   display: flex;
   flex: 1 1 0;
+  /* Same corner as the pane it holds (DL-18.12): `pingPane` appends
+     `.pane-ping` to the SLOT, not to the pane, so the locator's 2px line would
+     otherwise draw square ends out over the gutter where the pane's curve has
+     already receded. */
+  border-radius: var(--radius-tab);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -430,6 +487,24 @@
   overflow: hidden;
   background: var(--bg);
 }
+  /* 6px (owner, 2026-09-18). The existing `overflow: hidden` is what makes it
+     visible: xterm's canvases fill the pane and would otherwise paint over the
+     rounded corners, and the same clip keeps `.is-agent-working`'s own
+     top-edge overlays inside the curve. `.pane-ping` is NOT one of them — it
+     hangs off `.pane-slot`, which carries the matching radius above. */
+  border-radius: var(--radius-tab);
+  /* The card's own edge, added the same day the gutter was: `--sidebar-bg` is
+     only a few luminance units off `--bg`, so on a dark theme the gutter alone
+     left the corner legible and the straight runs invisible — the owner saw
+     exactly that in the dev app. `--seam-split` is the token the pane boundary
+     has always owned (DL-2.3); it moved from the line BETWEEN two panes to the
+     edge AROUND each one, so it is the same 20% of `--tone` doing the same
+     job at the new geometry. A real border and not `box-shadow: inset`
+     (DL-1.3's permitted hairline): xterm's canvases fill the padding box and
+     would paint straight over an inset line, while a border sits outside it.
+     The 1px costs the terminal nothing — the grid re-fits to the padding box
+     and a cell is never that small. */
+  border: 1px solid var(--seam-split);
 
 /* The pane's two yellow signals share one visual language but not one life:
    a rail click appends `.pane-ping` for a single 1.5s locator; any pane whose

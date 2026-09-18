@@ -135,12 +135,19 @@ from the active terminal theme (`--bg --fg --accent --red --green --yellow
   layouts left `--seam-recessed` and joined them (DL-18.6), because two
   boundaries in one window drawn in two different greys made the quieter one
   read as an artefact rather than as something somebody chose.
-  **Amended 2026-09-11, owner:** the pane split alone left `--seam-divider`
-  for `--seam-split` — 20% of `--tone`, `--hair-strong`'s weight — and went
-  from 1px to 2px. At 12% and one pixel a grid of panes still read too faint,
-  while the strip's bottom edge did not, so the split is now the one line
-  inside the work area drawn heavier than the rest. Its hover and drag accent
-  is unchanged.
+  **Superseded for the pane split, 2026-09-18, owner: there is no split line
+  at all.** The 2026-09-11 amendment had taken it to `--seam-split` (20% of
+  `--tone`, `--hair-strong`'s weight) at 2px because a grid of panes read too
+  faint at 12% and one pixel. Panes are now rounded cards separated by the
+  stage gutter (DL-18.12), so the boundary is a background STEP — the thing the
+  split never had — and a drawn line beside a gap would read as three surfaces
+  instead of two. `--seam-split` keeps its 20% and its job — it **moved from
+  the line between two panes to the 1px edge around each one**, because
+  `--sidebar-bg` sits only a few luminance units off `--bg` and on a dark theme
+  the step alone left a card's corner legible and its straight runs invisible
+  (owner, in the dev app, same day). The divider element remains as the drag
+  target, transparent until its hover and drag accent, which is unchanged. The
+  tab strip's bottom edge keeps `--seam-divider` (DL-18.6).
   `--seam-raised` frames a surface that floats above chrome (popovers,
   dialogs).
   **The step must stay louder than the seam that marks it.** Before this rule a
@@ -1434,13 +1441,19 @@ window's identity and its actions at the same time.
   absolute.** A resize seam lights its own hairline in full `--accent` while
   hovered, and for the whole of a drag — a target that says nothing until the
   column moves is found by guessing, and the app already answered this for pane
-  splits (`.split__divider:hover`). Full accent rather than that divider's 60%
-  mix: a shell seam has a chrome surface on at least one side, where the mix
-  reads as a lighter hairline instead of a lit line; a split divider stands
-  between two terminals on `--bg` and keeps its 60%. The line is 1px and sits ON the existing hairline
-  rather than beside it, so nothing new is drawn; only the colour of a line
-  that was already there changes, which keeps DL-2.3's one-boundary-one-seam
-  reading intact. The target itself also widened from 7px to 9px, for a
+  splits (`.split__divider:hover`). **Full accent, and since 2026-09-18 the
+  split divider takes the same value:** the 60% mix was justified by a
+  difference between the two — a shell seam has chrome on one side, a split
+  stands between two terminals on `--bg` — that DL-18.12 removed, because both
+  are now a 4px chrome gutter between two `--bg` cards. One idiom, one value.
+  **What lights is the GUTTER, not a hairline (2026-09-18, owner).** Until then
+  the lit line was 1px sitting ON the shell's own hairline, so that hovering
+  changed the colour of a line already there; once the stage stopped drawing
+  that hairline (DL-18.12) the same placement read as *grabbing the sidebar's
+  own border*, which is what the owner reported. The grip now fills
+  `--stage-gutter` at `--radius-flat`, so the bar the user grabs sits between
+  the two surfaces it moves instead of on the edge of one of them. The target
+  itself also widened from 7px to 9px, for a
   reported defect rather than a preference: along a 7px target the pointer
   crossed the edge repeatedly and the cursor flickered with it. Same figures on
   the docked column's seam (DL-19.4) — one gesture, one look, both edges.
@@ -1558,6 +1571,34 @@ window's identity and its actions at the same time.
   pane keeps only its static 2px yellow state. These were DL-1.2's only motion
   exceptions until 2026-08-25, when DL-27.3's unread ripple became the third;
   they remain the scoped yellow exceptions recorded in DL-3.1/DL-3.2.
+
+- **DL-18.12** **A pane is a card on the stage gutter (2026-09-18, owner).**
+  `--stage-gutter` is 4px and applies to all four edges of the work area AND
+  between panes ([`06-stage-panes.css`](../src/styles/06-stage-panes.css)); the
+  corner is 6px, DL-20.1's `--radius-tab` reused rather than a sixth role
+  opened at a use site. The gutter paints `--sidebar-bg`, the chrome the
+  navigation column already owns (DL-18.7), because the pane and the stage are
+  both `--bg` and a radius between two identical surfaces is invisible;
+  [`derive-colors.test.ts`](../src/lib/derive-colors.test.ts) already
+  guarantees `sidebarBg ≠ bg` in every theme. **That step is not enough on its
+  own, and the card carries a 1px `--seam-split` border as well** — the gutter
+  proved visible and the card's own outline did not. It is a real `border`, not
+  DL-1.3's permitted inset hairline: xterm fills the padding box and would
+  paint over an inset line. This reverses the full-bleed grid of
+  2026-08-17, whose whole argument — the split line must meet the tab strip's
+  hairline — dissolves once the split is a gap rather than a line (DL-2.3). The
+  document surface takes the same gutter and radius so the stage handover does
+  not change the rectangle's shape; the browser tab is the one accepted
+  exception, since its web content is a native view the host paints over
+  [`.browser-panel__view`](../src/browser/browser-panel.tsx) and CSS cannot round
+  it. 4px and not the old 8px
+  because a terminal is measured in cells and the earlier gutter cost columns.
+  **The shell's vertical hairline went with this change.** `.window--sidebar >
+  .stage`'s `border-left` was the one structural line in the shell while it
+  separated `--sidebar-bg` from `--bg`; with the gutter painting
+  `--sidebar-bg` on the stage side, the same 1px ran between two identical
+  surfaces — a line with no step behind it, which DL-2.3 forbids. The rail and
+  the gutter are one chrome plane now, and the card's border is the boundary.
 
 ## 19. Docked side panels
 
@@ -1730,6 +1771,9 @@ direction token rebuild §9.4
   its own. The tight role joined the earlier control/surface pair on
   2026-08-16, when surface came down from 16px so the closed scale reads
   8/10/12. A value chosen by feel at a use site is not part of this scale;
+  Amended 2026-09-18 (owner): `--radius-tab`'s membership now also covers the
+  stage's panes and document surface (DL-18.12), so the 6px corner is a shared
+  role rather than the strip's private number.
   `border-radius: 50%` and the 999px capsule stay shapes rather than scale
   values.
 - **DL-20.2** One motion pair for chrome state change: `--duration` (150ms) and
