@@ -16,8 +16,9 @@ whose only symptom when lost is `posix_spawnp failed`.
 
 | Command                              | What it does                                                                                                   |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `npm run electron:dev`               | Build the renderer and the main process, then launch Electron from `dist-electron/`                            |
-| `npm run electron:dev:watch`         | Same host with hot reload: the renderer loads the Vite dev server, main rebuilds and relaunches on save         |
+| `npm run electron:dev`               | Renderer HMR and incremental main/preload compilation through the [development watcher](../../scripts/electron-dev-watch.mjs) |
+| `npm run electron:dev:watch`         | Alias for `electron:dev`                                                                                     |
+| `npm run electron:dev:once`          | Build the renderer and main process, then launch once from `dist-electron/`                                   |
 | `npm run dev`                        | Browser-only Vite preview of the renderer; every IPC call fails soft                                            |
 | `npm run tauri dev`                  | The frozen Tauri host                                                                                          |
 | `npm test`                           | The Vitest suite                                                                                               |
@@ -39,6 +40,15 @@ whose only symptom when lost is `posix_spawnp failed`.
 
 `predev` and `prebuild` run `generate:menu`, so a plain `npm run build` always regenerates
 the Rust registry first.
+
+The [Electron dev compiler](../../scripts/electron-dev-build.mjs) follows imports from main
+and both preloads, including shared `src/` dependencies. It keeps output in
+`dist-electron/dev/`; failed builds keep the previous app running. Renderer-only changes
+stay with Vite. Main/preload or vendored browser-asset changes restart Electron, interrupting
+live terminal sessions and unsaved editor buffers. The [watcher](../../scripts/electron-dev-watch.mjs)
+waits for the old process to exit before launching again, and owns Vite until shutdown.
+Renderer refresh does not guarantee preservation of terminal or editor state when a
+component is remounted; use disposable sessions for development.
 
 ## CI
 

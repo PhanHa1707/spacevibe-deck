@@ -166,6 +166,11 @@ npm install
 npm run electron:dev
 ```
 
+The [development watcher](scripts/electron-dev-watch.mjs) updates the renderer through HMR
+and incrementally rebuilds the Electron main process and preloads. Main/preload changes
+restart the app and interrupt live terminal sessions. Use `npm run electron:dev:once` to
+build and launch once from the static renderer bundle.
+
 Create a local packaged macOS build with `npm run electron:package`. Release packaging is a
 separate signed and notarized workflow.
 
