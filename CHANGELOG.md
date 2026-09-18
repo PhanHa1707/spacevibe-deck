@@ -42,6 +42,10 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 
 ### Agents
 
+- **Removed yellow lines above terminal panes.** The [pane overlays](src/styles/06-stage-panes.css)
+  no longer animate while agents work or when selecting an agent from the sidebar.
+  Agent status indicators and pane navigation keep their existing behavior.
+
 - **Agent context above each terminal pane.** The
   [compact header](src/terminal/pane-agent-header.tsx) shows the agent logo and
   the same latest message as the sidebar. Claude Code panes offer an Effort
