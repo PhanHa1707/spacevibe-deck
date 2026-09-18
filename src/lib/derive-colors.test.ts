@@ -134,6 +134,13 @@ describe("deriveChromeColors", () => {
       expect(deriveChromeColors("#0a0a0b", "#e7e7e7").sidebarBg).not.toBe("#141414");
     });
 
+    it("keeps the legacy pin for backgrounds that still use it", () => {
+      // `#17181c` is no preset's background any more, so nothing else in the
+      // suite reaches this entry: deleting it would turn no test red while
+      // silently changing the sidebar of every theme still set to that colour.
+      expect(deriveChromeColors("#17181c", "#c0caf5").sidebarBg).toBe("#161b22");
+    });
+
     it("preserves the distinction for light and pure-black overrides", () => {
       for (const [bg, fg] of [
         ["#ffffff", "#333333"],
