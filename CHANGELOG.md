@@ -24,6 +24,16 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 
 ### Sidebar
 
+- **Workspace favicons in the sidebar.** [Project headers](src/ui/agent-rail.tsx)
+  show the workspace favicon when available, falling back to the folder icon
+  when the image is missing or cannot be displayed.
+
+- **Deck identity in the sidebar.** The [top row](src/ui/sidebar-toggle.tsx) now pairs
+  the collapse control on the left with the Deck logo, name and running version
+  on the right, separated from navigation by a border. The bordered `New Workspace`
+  button sits below it, above
+  the [scrolling project list](src/ui/agent-rail.tsx).
+
 - **Agent usage replaces Unread.** The [compact sidebar summary](src/ui/usage/agent-usage-summary.tsx)
   shows agent logos and remaining allowance, with reset times on hover.
   Electron reads Codex limits through its CLI and Claude Code limits through a
@@ -32,10 +42,25 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 
 ### Agents
 
+- **Agent context above each terminal pane.** The
+  [compact header](src/terminal/pane-agent-header.tsx) shows the agent logo and
+  the same latest message as the sidebar. Claude Code panes offer an Effort
+  button that opens the CLI's native model/effort picker. Use Left/Right to
+  choose effort and S to apply it to this session only; other agents have no
+  effort button.
+
+- Fresh Codex panes no longer show busy bars while their startup screen is painting
+  before the first input, through the [input guard](src/terminal/agent-attention.ts).
+
 - **Fresh Codex panes keep their own conversation.** The rail
   [requires an exact session identity](src/terminal/session-tail-store.ts), so a new pane
   stays blank until its own conversation is available, even when another Codex is active
   in the same folder.
+
+- **Launch agents side by side.** The compact [agent launch page](src/launcher/agent-launch-page.tsx)
+  opens from checkout New agent controls or Cmd/Ctrl+T. Run adds a pane beside the target;
+  Back and Escape return without creating a terminal. Right-click actions keep their
+  existing new-tab and shell behavior.
 
 - **Signals are off again after upgrading from 1.1.** Deck 1.1 saved every
   agent's reporting switch as on, and 1.2.0 took that as your choice, so it kept
@@ -46,7 +71,6 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 - **Codex no longer asks you to review your own hooks again.** Deck's Codex
   hooks [stay where they are](electron/agent-hooks/codex-hooks.ts) when Deck
   starts, instead of moving behind hooks you added later.
-
 - **Codex rows stop showing the busy bars while Codex is idle.** Codex 0.154
   animates its prompt background, which Deck read as work in progress. Deck now
   [launches Codex with its idle animations off](src/lib/agents/codex.ts); if you

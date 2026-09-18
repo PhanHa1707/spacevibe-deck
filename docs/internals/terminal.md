@@ -10,6 +10,18 @@ window-transfer protocols. The vocabulary is in [glossary.md](glossary.md).
 
 ## PTY ownership (main)
 
+The Electron [agent pane header](../../src/terminal/pane-agent-header.tsx) reads
+the same pane tail as the sidebar and disposes its subscriptions with the pane.
+The Claude-only Effort button sends the default Meta+P shortcut through the
+[pane's existing input callback](../../src/terminal/pane.ts). Claude owns the
+model/effort picker, its supported levels and confirmation. Left/Right chooses
+effort; S applies it to this session only on Claude Code 2.1.257 and later.
+Deck never submits a slash command, clears a draft, persists a default, or claims
+an effort value was applied. Custom Claude keybindings can change this shortcut;
+the [control's tooltip](../../src/lib/agent-effort.ts) identifies the default.
+Other agents have no effort control. The experimental Codex App Server bridge
+was removed when the owner narrowed the scope to Claude Code.
+
 [`electron/pty/manager.ts`](../../electron/pty/manager.ts) spawns and owns every PTY.
 Ids are process-local integers from 1, never reused.
 
@@ -123,6 +135,27 @@ Ids are process-local integers from 1, never reused.
   file tab so another preview cannot replace it.
 - The closed-tab stack holds 10 snapshots in memory (`layout`, `cwds`, `name`, `dotColor`,
   `workspacePath`); ⌘⇧T reopens with fresh shells and does not re-run agents.
+
+## Transient agent launch targets
+
+The [agent launch page](../../src/launcher/agent-launch-page-store.ts) captures stable
+terminal tab/pane identity before covering the stage. Its
+[target resolver](../../src/terminal/agent-launch-target.ts) prefers the active matching
+checkout tab, then an exact root, then a matching nested tab; another worktree is not a
+fallback. Windows path keys are comparison-only. Split launches require a fresh known
+cwd; unavailable cwd does not fall back to home.
+
+[TabManager](../../src/terminal/tab-manager.ts) validates the request before insertion.
+[TerminalManager](../../src/terminal/terminal-manager.ts) discards only newly spawned
+resources if cancellation, disposal or transfer invalidates that operation. Registration
+or insertion is the commit boundary: later page dismissal suppresses stale navigation,
+not the committed agent. Adapter preparation rechecks the committed pane's ownership and
+launchability independently of page visibility before arming its command. Optional guards
+and no-focus initialization preserve existing materialization callers' defaults.
+
+The page's launch receipt means a pane was created, not that its CLI is ready. Shell
+readiness still belongs to [AgentLauncher](../../src/terminal/agent-launch.ts); command-write
+failures from this route are reported visibly without automatically creating another pane.
 
 ## Materialization and agent launch
 
