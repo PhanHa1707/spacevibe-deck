@@ -69,15 +69,32 @@ const FAVICON_CANDIDATES = [
   "app/favicon.ico",
 ] as const;
 
-/** A project favicon under `dir` as a data URL, or null. Default workspace logo. */
+/**
+ * A project favicon under `dir` as a data URL, or null. Default workspace logo.
+ *
+ * Every candidate must resolve to a real file INSIDE `dir`. The rail scans
+ * this for every project it draws, with no user gesture, so a repository
+ * shipping `favicon.png` as a symlink out of the tree would otherwise hand any
+ * file the user can read back to the renderer as image bytes. Containment is
+ * checked on the RESOLVED path, so a link that stays inside still works and a
+ * link planted higher up the candidate's own path is caught too.
+ */
 export async function scanWorkspaceFavicon(dir: string): Promise<string | null> {
+  const root = await fs.realpath(dir).catch(() => null);
+  if (root === null) {
+    return null;
+  }
   for (const candidate of FAVICON_CANDIDATES) {
     const target = path.join(dir, candidate);
     try {
-      if (!(await fs.stat(target)).isFile()) {
+      const resolved = await fs.realpath(target);
+      if (resolved !== root && !resolved.startsWith(root + path.sep)) {
         continue;
       }
-      return await readImageAsDataUrl(target);
+      if (!(await fs.stat(resolved)).isFile()) {
+        continue;
+      }
+      return await readImageAsDataUrl(resolved);
     } catch {
       // Missing or unreadable: try the next candidate.
     }
