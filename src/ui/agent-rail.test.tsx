@@ -217,9 +217,9 @@ function click(element: Element | null | undefined): void {
  * 2026-08-26) — it shares no press target or accessible name with an agent
  * row, so this selector needs no `:not()` to stay a pure "how many agent
  * rows are open" count; tests that care about the launcher query
- * `.asr-card__new` directly. A card is CLOSED by default (window-local,
- * `openCardKeys`), so most tests that read rows must call `openAllCards()`
- * first; this alone does not open anything.
+ * `.asr-card__new` directly. A card is OPEN by default since 2026-09-18
+ * (window-local `foldedCardKeys`, DL-27.25 amended); `openAllCards()` stays
+ * as the explicit "every row visible" step and only presses folded heads.
  */
 function rows(): HTMLElement[] {
   return [...host.querySelectorAll<HTMLElement>(".asr-card__row")];
@@ -235,8 +235,13 @@ function branches(): string[] {
 /** Opens every worktree card currently on screen. Bare rows have no toggle. */
 function openAllCards(): void {
   act(() => {
+    // Cards open by default since 2026-09-18 (DL-27.25, amended): only a head
+    // the user folded is pressed, so this stays "make every row visible" and
+    // never folds a card that was already open.
     for (const head of host.querySelectorAll<HTMLElement>(".asr-card__head")) {
-      head.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      if (head.getAttribute("aria-expanded") === "false") {
+        head.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      }
     }
   });
 }
@@ -889,21 +894,26 @@ describe("AgentRail worktree groups (DL-27.23/DL-27.24, amended by the card)", (
 
 describe("AgentRail create controls (rail-create-consolidation, 2026-09-02)", () => {
   it("draws exactly one create control per checkout, and none on any project header", async () => {
-    // `/r/main` has a tab (a closed card, so the strip's trailing `+`);
-    // `/r/side` is history-only (a bare row, which is itself the control).
+    // `/r/main` has a tab (a card, open by default since 2026-09-18, so its
+    // `New agent` row); `/r/side` is history-only (a bare row, which is
+    // itself the control).
     mount({ cardActions: ACTIONS });
     await settle();
 
     expect(host.querySelectorAll(".asr-cluster__add")).toHaveLength(0);
-    expect(host.querySelectorAll(".asr-card__seg--add")).toHaveLength(1);
-    expect(host.querySelectorAll("button.asr-bare")).toHaveLength(1);
-    expect(host.querySelectorAll(".asr-card__new")).toHaveLength(0);
-
-    // Open, the card's control is its `New agent` row and the strip is gone —
-    // still one per checkout.
-    openAllCards();
     expect(host.querySelectorAll(".asr-card__seg--add")).toHaveLength(0);
     expect(host.querySelectorAll(".asr-card__new")).toHaveLength(1);
+    expect(host.querySelectorAll("button.asr-bare")).toHaveLength(1);
+
+    // Folded, the card's control is the strip's trailing `+` and the row is
+    // gone — still one per checkout.
+    act(() => {
+      host
+        .querySelector<HTMLElement>(".asr-card__head")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(host.querySelectorAll(".asr-card__seg--add")).toHaveLength(1);
+    expect(host.querySelectorAll(".asr-card__new")).toHaveLength(0);
     expect(host.querySelectorAll("button.asr-bare")).toHaveLength(1);
   });
 

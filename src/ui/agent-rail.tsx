@@ -47,7 +47,7 @@ import { isTauriHost } from "../updater/migration-notice";
  * this file only decides which checkouts exist and hands each one off. A labelled
  * project can still collapse as a whole, one disclosure per cluster; a card's
  * own open/closed state is a separate, window-local disclosure one tier down
- * (`openCardKeys`).
+ * (`foldedCardKeys` — open by default since 2026-09-18, DL-27.25 amended).
  *
  * Ported from the owner-approved gallery specimen
  * `src/gallery/agent-status-rail.tsx`, whose `asr-` class names are kept 1:1 so
@@ -64,7 +64,13 @@ export interface AgentRailProps {
     readonly onOpenWorkspace: () => void;
     readonly openWorkspaceDisabled?: boolean;
     readonly onResumeWorktree: (path: string) => void;
-    readonly onFocusAttention?: (index: number) => void;
+    /**
+     * Focus the pane that needs the user. With an index it targets that tab
+     * (the legacy rail's rows); without one it is ⌘⇧A's own preflight and
+     * picks the loudest pane in the window, which is what the card rail's
+     * `Needs me` line presses (DL-27.26).
+     */
+    readonly onFocusAttention?: (index?: number) => void;
   };
   /**
    * Select an already-open tab by its global index. Every shell-only card row
@@ -142,12 +148,15 @@ function WorktreeCardRail(props: AgentRailProps) {
   // Which labelled project groups are folded. A new Set each time rather than
   // a mutated one (C1), so the signal actually notifies.
   const collapsedGroupKeys = useSignal<ReadonlySet<string>>(new Set());
-  // Which worktree cards are open, keyed by `RailWorktreeGroup.key` (the
-  // worktree's own path) — the `toggleGroup` precedent, one tier down.
-  // WINDOW-LOCAL and unpersisted, per the owner's 2026-08-26 answer (design
-  // §11.6/§13.7): settings are app-level, so persisting would make every
-  // window share one open/closed state.
-  const openCardKeys = useSignal<ReadonlySet<string>>(new Set());
+  // Which worktree cards the user has FOLDED, keyed by `RailWorktreeGroup.key`
+  // (the worktree's own path) — the `toggleGroup` precedent, one tier down.
+  // Inverted on 2026-09-18 (owner, design review L1; DL-27.25 amended): a
+  // card is open unless folded, so the rail at rest prints each agent's newest
+  // sentence instead of a strip of glyphs the user had to press open after
+  // every launch. Still WINDOW-LOCAL and unpersisted, per the owner's
+  // 2026-08-26 answer (design §11.6/§13.7): settings are app-level, so
+  // persisting would make every window share one open/closed state.
+  const foldedCardKeys = useSignal<ReadonlySet<string>>(new Set());
 
   const view = buildAgentRail({
     tabs,
@@ -243,12 +252,23 @@ function WorktreeCardRail(props: AgentRailProps) {
   }
 
   function toggleCard(key: string): void {
-    const next = new Set(openCardKeys.value);
+    const next = new Set(foldedCardKeys.value);
     if (!next.delete(key)) {
       next.add(key);
     }
-    openCardKeys.value = next;
+    foldedCardKeys.value = next;
   }
+
+  // DL-27.26: how many panes are waiting on the user right now — the two
+  // states ⌘⇧A answers, `asked` and `failed` — counted over every card the
+  // rail draws, folded or not. Zero draws nothing: the line exists to be
+  // loud when something is, and a permanent `Needs me 0` would be chrome
+  // that speaks while nobody needs anything.
+  const needsMe = view.stream
+    .flatMap((group) => group.worktrees)
+    .flatMap((worktree) => worktree.panes)
+    .filter((pane) => pane.state === "asked" || pane.state === "failed").length;
+  const onNeedsMe = props.legacy.onFocusAttention;
 
   return (
     <nav class="asr-rail asr-rail--mounted" aria-label="Agents">
@@ -256,6 +276,36 @@ function WorktreeCardRail(props: AgentRailProps) {
           pinned to the bottom of the column, which is the split `.wsbar__list`
           drew before this rail replaced it. */}
       <div class="asr-rail__list" ref={listRef}>
+        {/* The `Needs me N` line (DL-27.26, 2026-09-18): one count above the
+            clusters, pressing it runs ⌘⇧A. Before it, "which agent needs me"
+            was a 4px corner badge on a strip glyph and nothing in the rail
+            said how many. Omitted rather than inert when nothing wires the
+            focus (the gallery, DL-19.7) — then it is a still count. Outside
+            `.asr-stream` on purpose: the drag controller resolves clusters
+            against the stream's children. */}
+        {needsMe > 0 && (
+          <div class="asr-needs">
+            {onNeedsMe === undefined ? (
+              <span class="asr-needs__chip">
+                <span>Needs me</span>
+                <span class="asr-needs__count">{needsMe}</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                class="asr-needs__chip"
+                aria-label={`${needsMe} ${needsMe === 1 ? "agent needs" : "agents need"} you — focus the next one`}
+                title="Focus the next agent that needs you"
+                onClick={() => {
+                  onNeedsMe();
+                }}
+              >
+                <span>Needs me</span>
+                <span class="asr-needs__count">{needsMe}</span>
+              </button>
+            )}
+          </div>
+        )}
         <section class="asr-stream" aria-label="Open agents">
           {view.stream.map((group) => {
             const collapsed = collapsedGroupKeys.value.has(group.key);
@@ -393,14 +443,14 @@ function WorktreeCardRail(props: AgentRailProps) {
                     cluster (DL-27.11/DL-27.24): a folded project hides its
                     cards with its rows. A card's own open/closed state is a
                     SEPARATE, window-local disclosure one tier down
-                    (`openCardKeys`). */}
+                    (`foldedCardKeys`): open unless the user folded it. */}
                 {!collapsed &&
                   group.worktrees.map((worktree) => (
                     <WorktreeCard
                       key={worktree.key}
                       project={group.project}
                       group={worktree}
-                      open={openCardKeys.value.has(worktree.key)}
+                      open={!foldedCardKeys.value.has(worktree.key)}
                       onToggle={toggleCard}
                       onFocusPane={props.onFocusPane}
                       onClosePane={props.onClosePane}
