@@ -31,7 +31,7 @@
     "electron:package:release": "node scripts/verify-electron-release-signing.mjs && npm run build && npm run electron:build && electron-builder --config electron-builder.release.yml --mac --arm64 --publish never",
     "electron:package:monaco-smoke": "npm run build && npm run build:monaco-smoke-renderer && npm run electron:build && electron-builder --config electron-builder.monaco-smoke.yml --mac --universal --dir --publish never",
     "electron:verify:monaco-smoke": "node scripts/verify-electron-monaco-smoke-package.mjs",
-    "electron:dev": "npm run build && npm run electron:build && electron dist-electron/electron/main.cjs",
+    "electron:dev": "npm run build && npm run electron:build && node scripts/electron-dev-launch.mjs",
     "electron:dev:watch": "node scripts/electron-dev-watch.mjs",
     "electron:smoke": "npm run build && npm run electron:build && electron dist-electron/electron/smoke.cjs",
     "electron:smoke:updater": "node scripts/updater-smoke.mjs",

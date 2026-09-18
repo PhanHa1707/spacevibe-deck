@@ -17,12 +17,10 @@ import { spawn } from "node:child_process";
 import { watch } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-// The `electron` package's main export is the path to its executable — the
-// standard way to invoke it without depending on node_modules/.bin being on
-// PATH, which is only true when this script itself was launched via `npm run`.
-import electronBin from "electron";
+import { prepareDevElectron } from "./electron-dev-launch.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const electronBin = prepareDevElectron();
 // Fixed by `vite.config.ts` for the Tauri host too; Electron's window loads
 // the same URL in dev mode.
 const DEV_SERVER_URL = "http://localhost:1420";
