@@ -1019,4 +1019,20 @@ describe("agent launcher create controls", () => {
       expect(host.querySelector('[role="menu"]')).not.toBeNull();
     },
   );
+
+  // The flat shape has no `.asr-card` to right-click, so before the create row
+  // carried the gesture this path lost every pointer route to `Open shell`.
+  it("keeps the actions menu reachable for a folder git does not know", () => {
+    const onOpenAgentLauncher = vi.fn();
+    const actions = { ...cardActions(), onOpenAgentLauncher };
+    mount({ group: group({ labelled: false, panes: [pane()] }), actions });
+    expect(host.querySelector(".asr-card")).toBeNull();
+    const row = host.querySelector<HTMLButtonElement>(".asr-card__new")!;
+    act(() => row.click());
+    expect(onOpenAgentLauncher).toHaveBeenCalledOnce();
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+    act(() => void row.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true })));
+    expect(host.querySelector('[role="menu"]')).not.toBeNull();
+    expect(onOpenAgentLauncher).toHaveBeenCalledOnce();
+  });
 });

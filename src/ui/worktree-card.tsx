@@ -384,6 +384,11 @@ function FlatEntries({
               }
               menu.toggleAt(row.getBoundingClientRect(), row);
             }}
+            // This shape has no card box to right-click, so the create row is
+            // the anchor. Without it, a folder git does not know loses every
+            // pointer route to `Open shell` once the press opens the launch
+            // page instead of the menu.
+            onContext={(row) => menu.openAt(row.getBoundingClientRect())}
           />
           <CheckoutMenu project={project} group={group} actions={actions} menu={menu} />
         </Fragment>
@@ -482,11 +487,13 @@ function NewAgentRow({
   open,
   opensPage = false,
   onPress,
+  onContext,
 }: {
   readonly where: string;
   readonly open: boolean;
   readonly opensPage?: boolean;
   readonly onPress: (row: HTMLButtonElement) => void;
+  readonly onContext?: (row: HTMLButtonElement) => void;
 }) {
   return (
     <button
@@ -498,6 +505,14 @@ function NewAgentRow({
       onClick={(event) => {
         onPress(event.currentTarget);
       }}
+      onContextMenu={
+        onContext === undefined
+          ? undefined
+          : (event) => {
+              event.preventDefault();
+              onContext(event.currentTarget);
+            }
+      }
     >
       <span class="asr-card__glyph asr-card__glyph--new" aria-hidden="true">
         <DeckIcon icon={Plus} size={CHROME_ICON} />
