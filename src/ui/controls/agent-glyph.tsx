@@ -10,7 +10,7 @@
  * Presentational only. The caller passes the class it wants so each surface
  * keeps its own sizing and layout; this decides the CONTENT, never the box.
  */
-import { AGENT_LOGOS } from "../../lib/agent-logos";
+import { AGENT_INK_MARKS, AGENT_LOGOS } from "../../lib/agent-logos";
 import { letterAvatar } from "../../lib/letter-avatar";
 import type { PaneAgent } from "../../lib/process-info";
 
@@ -21,6 +21,17 @@ export interface AgentGlyphProps {
 }
 
 export function AgentGlyph({ agent, className }: AgentGlyphProps) {
+  const ink = AGENT_INK_MARKS[agent];
+  // A single-colour mark is drawn inline in `currentColor` (2026-09-18,
+  // design review F1): as an `<img>` its white fill vanished on the light
+  // theme. The box is still the caller's class; only the paint changed.
+  if (ink !== undefined) {
+    return (
+      <svg class={className} viewBox={ink.viewBox} fill="currentColor" aria-hidden="true">
+        <path d={ink.path} />
+      </svg>
+    );
+  }
   const logo = AGENT_LOGOS[agent];
   // A declared agent ships no brand mark, so it wears a letter instead of an
   // empty circle — the same fallback the workspace rows have always used.
