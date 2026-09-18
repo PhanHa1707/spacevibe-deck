@@ -3,6 +3,8 @@ import type { FileSurfaceController } from "../files/file-surface-controller";
 import { TabStrip } from "./tab-strip";
 
 interface TabBarProps {
+  transientPageOpen?: boolean;
+  onBeforeSelect?: () => void;
   onSelectTab(index: number): void;
   onCloseTab(index: number): void | Promise<void>;
   onCloseTabs?(indexes: readonly number[]): Promise<boolean>;
@@ -47,6 +49,8 @@ export function TabBar(props: TabBarProps) {
           (DL-18.5 — nothing is reserved where no OS paints). */}
       <div class="deck-frame__lights" aria-hidden="true" />
       <TabStrip
+        transientPageOpen={props.transientPageOpen}
+        onBeforeSelect={props.onBeforeSelect}
         onSelectTab={props.onSelectTab}
         onCloseTab={props.onCloseTab}
         onCloseTabs={props.onCloseTabs}

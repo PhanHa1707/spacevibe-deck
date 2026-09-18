@@ -1,3 +1,11 @@
+import { agentLaunchPage } from "../launcher/agent-launch-page-store";
+import {
+  resolveAgentLaunchTarget,
+  type AgentLaunchTarget,
+  type AgentLaunchResult,
+  type AgentLaunchReceipt,
+} from "./agent-launch-target";
+import { detectedAgents } from "./agent-detection-store";
 import { getCurrentWindow } from "../host/window-host";
 import type { UnlistenFn } from "../host/bridge";
 import { clampFontSize, DEFAULT_SETTINGS } from "../settings/settings-schema";
@@ -115,6 +123,7 @@ import {
   boardOpen,
   editorRequest,
   promptsOpen,
+  railCardMenuOpen,
   reportChromeMessage,
   saveDialogOpen,
   settingsOpen,
@@ -154,6 +163,13 @@ const WINDOWS_STARTUP_POLL_FALLBACK_MS = 4000;
  * opens before the agent's first turn rather than up to 2 s after it.
  */
 const LAUNCH_FOLLOW_UP_POLL_MS = 1000;
+
+/**
+ * A launch failure whose message was written for the agent launch page. The
+ * catch in `launchAgentAtTarget` cannot tell a user-facing reason from an
+ * internal fault otherwise, so it used to replace both with one generic line.
+ */
+class LaunchPageMessage extends Error {}
 
 export function createTabManager(
   host: HTMLElement,
@@ -286,7 +302,15 @@ export function createTabManager(
   // relaunch into the same pane replaces rather than stacks it, and cleared on
   // dispose so a torn-down manager never polls a dead host.
   const launchFollowUpPolls = new Map<number, ReturnType<typeof setTimeout>>();
+  const pageLaunchOwners = new Map<number, TabEntry>();
   const launcher = createAgentLauncher(paneIo, {
+    onWriteFailure: (id) => {
+      const owner = pageLaunchOwners.get(id);
+      if (owner !== undefined && ownerOf(id) === owner) {
+        reportChromeMessage("Could not start the agent. Its terminal pane is still open.");
+      }
+      pageLaunchOwners.delete(id);
+    },
     platform: environment.platform,
     onTimeout: () => {
       reportAgentLaunchTimeout(WINDOWS_AGENT_TIMEOUT_MESSAGE);
@@ -367,15 +391,21 @@ export function createTabManager(
     return { id, command: augmented.command };
   }
 
-  async function armLaunch(entries: readonly AgentLaunchEntry[]): Promise<void> {
+  async function armLaunch(
+    entries: readonly AgentLaunchEntry[],
+    canArm?: () => boolean,
+  ): Promise<boolean> {
     if (!signalsEnabled) {
+      if (canArm?.() === false) return false;
       launcher.arm(entries);
-      return;
+      return true;
     }
     const armed = await Promise.all(entries.map(prepareLaunch));
-    if (!disposed) {
+    if (!disposed && canArm?.() !== false) {
       launcher.arm(armed);
+      return true;
     }
+    return false;
   }
 
   /**
@@ -698,6 +728,7 @@ export function createTabManager(
     for (const id of [...launchCommandByPane.keys()]) {
       if (!alive.has(id)) {
         launchCommandByPane.delete(id);
+        pageLaunchOwners.delete(id);
       }
     }
   }
@@ -772,7 +803,9 @@ export function createTabManager(
     layout: SerializedNode | null,
     cwds: readonly (string | null)[] = [],
     workspacePath: string | null = null,
+    options: Pick<MaterializeIntent, "canCommit" | "focusOnInit"> = {},
   ): Promise<TabEntry | null> {
+    if (options.canCommit?.() === false) return null;
     const container = document.createElement("div");
     container.className = "tab-stage";
     container.style.display = "none";
@@ -780,14 +813,28 @@ export function createTabManager(
     const manager = createTerminalManager(container, callbacks, paneIo, managerDeps(nextKey));
     try {
       if (layout === null) {
-        await manager.initFresh(cwds[0] ?? null);
+        await manager.initFresh(cwds[0] ?? null, {
+          canCommit: options.canCommit,
+          focus: options.focusOnInit,
+        });
       } else {
-        await manager.initFromLayout(layout, cwds);
+        await manager.initFromLayout(layout, cwds, {
+          canCommit: options.canCommit,
+          focus: options.focusOnInit,
+        });
       }
     } catch (err) {
+      if (options.canCommit?.() === false) {
+        manager.dispose();
+        return null;
+      }
       console.error("Failed to open tab:", err);
       manager.dispose();
       activeManager()?.notifyError(`Failed to open new tab: ${err}`);
+      return null;
+    }
+    if (options.canCommit !== undefined && (disposed || !options.canCommit())) {
+      manager.dispose();
       return null;
     }
     // Returned rather than left for the caller to fish out of `tabs`: reading
@@ -1136,7 +1183,7 @@ export function createTabManager(
     // tab spawns another rather than focusing the first, so the same repo can
     // run several agent sessions side by side. `workspacePath` is a label the
     // tab carries (sidebar, logo, reopen), never an identity that dedupes.
-    const entry = await addTab(intent.layout, intent.cwds, intent.workspacePath ?? null);
+    const entry = await addTab(intent.layout, intent.cwds, intent.workspacePath ?? null, intent);
     if (entry === null) {
       return null;
     }
@@ -1301,6 +1348,164 @@ export function createTabManager(
           }),
       ...(workspacePath !== null ? { workspacePath } : {}),
     });
+  }
+
+  function captureAgentLaunchTarget(workspacePath: string, checkoutRoots: readonly string[] = []) {
+    return resolveAgentLaunchTarget(
+      workspacePath,
+      tabs.map((entry) => {
+        const id = entry.manager.activePaneId();
+        return {
+          key: entry.key,
+          workspacePath: entry.workspacePath,
+          paneId: id !== null && entry.manager.isPaneLaunchable(id) ? id : null,
+        };
+      }),
+      tabs[active]?.key ?? null,
+      checkoutRoots,
+      environment.platform,
+    );
+  }
+
+  function pageAgentCommand(agentId: string): string | null {
+    const current = settings.value;
+    const choice = agentOptions(
+      detectedAgents.value,
+      current.customAgents,
+      current.disabledAgents,
+    ).find((agent) => agent.id === agentId && !agent.missing);
+    return choice === undefined
+      ? null
+      : agentLaunchCommand(
+          agentId,
+          current.launchProfiles,
+          current.defaultLaunchProfiles,
+          current.customAgents,
+        );
+  }
+
+  async function createPageLaunchPane(
+    target: AgentLaunchTarget,
+    canCommit: () => boolean,
+    checkoutRoots: () => readonly string[],
+  ): Promise<{ owner: TabEntry; paneId: number } | null> {
+    if (target.kind === "first-pane") {
+      const valid = () =>
+        canCommit() &&
+        !disposed &&
+        captureAgentLaunchTarget(target.workspacePath, checkoutRoots())?.kind === "first-pane";
+      const entry = await materializeEntry({
+        layout: null,
+        cwds: [target.workspacePath],
+        workspacePath: target.workspacePath,
+        agent: null,
+        launchCommand: null,
+        select: false,
+        focusOnInit: false,
+        canCommit: valid,
+      });
+      const id = entry?.manager.paneIds()[0];
+      return entry === null || id === undefined ? null : { owner: entry, paneId: id };
+    }
+    const owner = tabs.find((entry) => entry.key === target.tabKey);
+    const valid = () =>
+      canCommit() &&
+      !disposed &&
+      owner !== undefined &&
+      ownerOf(target.paneId) === owner &&
+      owner.manager.isPaneLaunchable(target.paneId) &&
+      resolveAgentLaunchTarget(
+        target.workspacePath,
+        [{ key: owner.key, workspacePath: owner.workspacePath, paneId: target.paneId }],
+        owner.key,
+        checkoutRoots(),
+        environment.platform,
+      )?.kind === "split";
+    if (!valid() || owner === undefined) return null;
+    const cwd = await freshCwd(target.paneId, pty);
+    if (!valid()) return null;
+    if (!cwd?.trim()) throw new LaunchPageMessage("Could not read the target folder. Try again.");
+    const id = await owner.manager.dockNewPaneAt(target.paneId, "right", {
+      cwd,
+      focus: false,
+      canCommit: valid,
+    });
+    return id === null ? null : { owner, paneId: id };
+  }
+
+  async function launchAgentAtTarget(
+    target: AgentLaunchTarget,
+    agentId: string,
+    canCommit: () => boolean,
+    checkoutRoots: () => readonly string[] = () => [],
+  ): Promise<AgentLaunchResult> {
+    if (!canCommit() || disposed) return { kind: "cancelled" };
+    const command = pageAgentCommand(agentId);
+    if (command === null)
+      return {
+        kind: "failed",
+        message: "This agent is no longer available. Choose another agent.",
+      };
+    const valid = () => !disposed && canCommit() && pageAgentCommand(agentId) === command;
+    const finishStartupSpawn = beginWindowsStartupSpawn();
+    try {
+      const created = await createPageLaunchPane(target, valid, checkoutRoots);
+      if (created === null)
+        return canCommit()
+          ? {
+              kind: "failed",
+              message:
+                "The launch destination changed or could not be opened. Go back and try again.",
+            }
+          : { kind: "cancelled" };
+      const { owner, paneId } = created;
+      const owned = () =>
+        !disposed && ownerOf(paneId) === owner && owner.manager.isPaneLaunchable(paneId);
+      launchCommandByPane.set(paneId, command);
+      pageLaunchOwners.set(paneId, owner);
+      // First-pane materialization already registered startup readiness.
+      const pollDeferred = target.kind === "first-pane" || deferWindowsStartupPoll([paneId]);
+      void armLaunch([{ id: paneId, command }], owned)
+        .then((armed) => {
+          if (!armed && !disposed) {
+            pageLaunchOwners.delete(paneId);
+            reportChromeMessage("The agent did not start because its pane moved or closed.");
+          }
+        })
+        .catch((error) => {
+          console.error("Agent page command preparation failed:", error);
+          pageLaunchOwners.delete(paneId);
+          if (!disposed)
+            reportChromeMessage("Could not start the agent. Its terminal pane is still open.");
+        });
+      countAgentLaunch(agentId);
+      if (!pollDeferred) void poller.poll();
+      syncViews();
+      return {
+        kind: "spawned",
+        receipt: { tabKey: owner.key, paneId, canFocus: () => owned() && !launcher.failed(paneId) },
+      };
+    } catch (error) {
+      console.error("Agent page launch failed:", error);
+      return canCommit()
+        ? {
+            kind: "failed",
+            // A message written FOR the page survives the catch; anything else
+            // is an internal fault the user cannot act on, so it stays generic.
+            message:
+              error instanceof LaunchPageMessage
+                ? error.message
+                : "Could not open the agent in this folder. Try again.",
+          }
+        : { kind: "cancelled" };
+    } finally {
+      finishStartupSpawn?.();
+    }
+  }
+
+  function focusAgentLaunch(receipt: AgentLaunchReceipt): void {
+    const index = tabs.findIndex((entry) => entry.key === receipt.tabKey);
+    if (index >= 0 && receipt.canFocus()) activateForAttention(index, receipt.paneId);
   }
 
   /**
@@ -2527,7 +2732,7 @@ export function createTabManager(
     if (settingsOpen.value) {
       ranks.push(TIER_RANK.settings);
     }
-    if (boardOpen.value) {
+    if (boardOpen.value || agentLaunchPage.request.value !== null) {
       ranks.push(TIER_RANK.board);
     }
     if (
@@ -2724,8 +2929,29 @@ export function createTabManager(
     );
   }
 
+  function agentLaunchPageIsTop(): boolean {
+    return (
+      agentLaunchPage.request.value !== null &&
+      !settingsOpen.value &&
+      !boardOpen.value &&
+      editorRequest.value === null &&
+      !saveDialogOpen.value &&
+      !railCardMenuOpen.value &&
+      !agentQuickPickerOpen.value &&
+      !usageConsentOpen.value
+    );
+  }
+
   /** The dispatch half, shared by the keymap and the menu. */
   function dispatchAction(action: ShortcutAction): void {
+    const pageIsTop = agentLaunchPageIsTop();
+    if (pageIsTop && (action === "new-tab" || action === "close-pane")) {
+      agentLaunchPage.close(true);
+      return;
+    }
+    if (pageIsTop && (action === "toggle-browser" || action === "toggle-agent-board")) {
+      agentLaunchPage.close();
+    }
     if (overlayBlocksAction(action)) {
       return;
     }
@@ -2744,6 +2970,7 @@ export function createTabManager(
     // still have file chips. Counting only tabs there would let a digit
     // activate a document UNDER a board that never dismissed.
     if (isTabSwitchAction(action) && stripSlots().length > 0) {
+      agentLaunchPage.close();
       // F1 (2026-07-27 code review): mirrors App.selectTab's click path
       // (app.tsx), which has always cleared boardOpen before switching.
       // Without this, selectTab()'s manager.show() focuses the newly active
@@ -2821,6 +3048,12 @@ export function createTabManager(
     // any bound chord runs its own action first — pressing ⌘W to rebind
     // `close-pane` would kill the pane instead. See `shortcutCaptureActive`.
     if (shortcutCaptureActive.value) {
+      return;
+    }
+    if (event.key === "Escape" && agentLaunchPageIsTop()) {
+      event.preventDefault();
+      event.stopPropagation();
+      agentLaunchPage.close(true);
       return;
     }
     const action = matchBinding(event);
@@ -3102,21 +3335,20 @@ export function createTabManager(
         onOver(x, y) {
           // The board has no drop target — a drop while it is up must not
           // reach the terminal hiding behind it.
-          if (boardOpen.value) {
+          if (boardOpen.value || agentLaunchPage.request.value !== null) {
+            activeManager()?.fileDragLeave();
             return;
           }
           activeManager()?.fileDragOver(x, y);
         },
         onDrop(x, y, paths) {
-          if (boardOpen.value) {
+          if (boardOpen.value || agentLaunchPage.request.value !== null) {
+            activeManager()?.fileDragLeave();
             return;
           }
           activeManager()?.fileDrop(x, y, paths);
         },
         onLeave() {
-          if (boardOpen.value) {
-            return;
-          }
           activeManager()?.fileDragLeave();
         },
       }),
@@ -3135,6 +3367,9 @@ export function createTabManager(
     materializePane,
     openFromPreset,
     openQuickAgent,
+    captureAgentLaunchTarget,
+    launchAgentAtTarget,
+    focusAgentLaunch,
     launchTask,
     retryTaskPrompt,
     canRetryTaskPrompt,
@@ -3195,6 +3430,7 @@ export function createTabManager(
     },
     dispose() {
       disposed = true;
+      pageLaunchOwners.clear();
       launcher.dispose();
       poller.stop();
       registrySync.stop();

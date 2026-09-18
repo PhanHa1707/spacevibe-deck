@@ -987,3 +987,32 @@ describe("createEntry", () => {
     expect(pendingTreeFocus.value).toBeNull();
   });
 });
+
+describe("launcher navigation boundary", () => {
+  it("dismisses before file activation and does not focus through a newer page", async () => {
+    const h = harness();
+    let finish!: (value: Awaited<ReturnType<FileClient["readFile"]>>) => void;
+    const read = new Promise<Awaited<ReturnType<FileClient["readFile"]>>>((done) => {
+      finish = done;
+    });
+    const beforeActivate = vi.fn(() => expect(activeFileTab.value).toBeNull());
+    let allowFocus = true;
+    const controller = createFileSurfaceController({
+      client: { ...h.client, readFile: () => read },
+      beforeActivate,
+      canFocus: () => allowFocus,
+    });
+    const focus = vi.fn();
+    controller.setEditorFocus(focus);
+    const opening = controller.openFile(ROOT, FILE, false);
+    expect(beforeActivate).toHaveBeenCalledOnce();
+    expect(activeFileTab.value).toBe(FILE);
+    allowFocus = false;
+    finish({ kind: "refused", reason: "gone" });
+    await opening;
+    expect(focus).not.toHaveBeenCalled();
+    expect(beforeActivate).toHaveBeenCalledOnce();
+    controller.dispose();
+    h.controller.dispose();
+  });
+});

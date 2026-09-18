@@ -49,6 +49,7 @@ export interface StageSlotDescriptor {
 }
 
 export interface StageSurfaceStripDeps {
+  readonly beforeActivate?: () => void;
   /** The file controller's own strip — delegated to for every file index. */
   readonly files: SurfaceStrip;
   readonly client: BrowserClient;
@@ -111,6 +112,8 @@ export function composeSurfaceStrip(deps: StageSurfaceStripDeps): SurfaceStrip {
     // `index === files.count()` test would claim the board's slot as the
     // browser's the moment the browser is closed and the board is open.
     activate(index) {
+      if (index >= 0 && index < files.count() + browserSlot() + boardSlot())
+        deps.beforeActivate?.();
       if (index === boardIndex()) {
         if (agentBoardSurfaceActive.value) {
           return; // already on the stage

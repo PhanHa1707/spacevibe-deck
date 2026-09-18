@@ -413,6 +413,7 @@ export interface CardActions {
   /** `openQuickAgent(agentId, destination)` — the destination overrides both
    * cwd and workspace tag, which is what that argument was built for. */
   onRunAgent(agentId: string, workspacePath: string): void;
+  onOpenAgentLauncher?(workspacePath: string): void;
   /** Open a plain shell in a new Deck tab at this checkout. */
   onOpenShell?(workspacePath: string): void;
   /**

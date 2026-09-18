@@ -22,6 +22,25 @@ afterEach(() => {
 });
 
 describe("createAgentLauncher", () => {
+  it("reports a rejected command write once without respawning", async () => {
+    const error = new Error("PTY unavailable");
+    const pty = {
+      ...createMemoryPtyClient(),
+      writePty: vi.fn(async () => {
+        throw error;
+      }),
+    };
+    const onWriteFailure = vi.fn();
+    const launcher = createAgentLauncher(pty, { onWriteFailure });
+    launcher.arm([{ id: 1, command: "claude" }]);
+    launcher.noteOutput(1);
+    await Promise.resolve();
+    launcher.noteOutput(1);
+    expect(onWriteFailure).toHaveBeenCalledExactlyOnceWith(1, error);
+    expect(launcher.failed(1)).toBe(true);
+    expect(pty.writePty).toHaveBeenCalledTimes(1);
+    launcher.dispose();
+  });
   it.each(["windows", "macos"] as const)(
     "types the OpenCode command unchanged on %s",
     (platform) => {

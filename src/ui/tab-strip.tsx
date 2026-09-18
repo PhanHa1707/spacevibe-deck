@@ -29,6 +29,8 @@ import { createTabStripDrag } from "./tab-strip-drag";
 import { closeChips, closeTargets, type TabCloseTarget } from "./tab-strip-close";
 
 export interface TabStripProps {
+  transientPageOpen?: boolean;
+  onBeforeSelect?: () => void;
   onSelectTab(index: number): void;
   onCloseTab(index: number): void | Promise<void>;
   /** One existing Busy guard over the union of the targeted terminal panes. */
@@ -84,7 +86,8 @@ function terminalChips(props: TabStripProps, surfaceActive: boolean): readonly C
           <DeckIcon icon={TerminalWindow} size={CHROME_ICON} />
         ),
         select: () => {
-          if (index !== active || surfaceActive) props.onSelectTab(index);
+          if (index !== active || surfaceActive || props.transientPageOpen)
+            props.onSelectTab(index);
         },
         close: () => {
           const current = tabViews.value.findIndex((item) => item.key === tab.key);
@@ -131,7 +134,10 @@ function surfaceChips(props: TabStripProps): readonly Chip[] {
         active: browser ? browserSurfaceActive.value : agentBoardSurfaceActive.value,
         glyph: <DeckIcon icon={browser ? Globe : SquaresFour} size={CHROME_ICON} />,
         select: () => {
-          if (browser ? !browserSurfaceActive.value : !agentBoardSurfaceActive.value) {
+          if (
+            props.transientPageOpen ||
+            (browser ? !browserSurfaceActive.value : !agentBoardSurfaceActive.value)
+          ) {
             (browser ? props.onSelectBrowser : props.onSelectAgentBoard)();
           }
         },
@@ -235,7 +241,10 @@ export function TabStrip(props: TabStripProps) {
               data-pinned={String(pinned)}
               class={`tab ${chip.kind === "terminal" ? "" : `tab--${chip.kind}`} ${chip.active ? "is-active" : ""} ${pinned ? "is-pinned" : ""}`}
               title={chip.label}
-              onClick={chip.select}
+              onClick={() => {
+                props.onBeforeSelect?.();
+                chip.select();
+              }}
               onContextMenu={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -250,6 +259,7 @@ export function TabStrip(props: TabStripProps) {
                   openMenu(chip, event.currentTarget, rect.left, rect.bottom);
                 } else if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
+                  props.onBeforeSelect?.();
                   chip.select();
                 }
               }}

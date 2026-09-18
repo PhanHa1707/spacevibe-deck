@@ -261,6 +261,19 @@ describe("settings load recovery layer", () => {
 });
 
 describe("task launcher mount", () => {
+  // Source contract only; native focus remains an Electron acceptance check.
+  it.each([
+    ["onRunAgent", "openQuickAgent(agentId, workspacePath)"],
+    ["onOpenShell", "openQuickAgent(null, workspacePath)"],
+    ["onSplitHere", "splitInWorkspace(workspacePath)"],
+  ])("dismisses the page before the existing %s action", (callback, invocation) => {
+    const start = source.indexOf(`${callback}: (`);
+    expect(start).toBeGreaterThan(-1);
+    const body = source.slice(start, source.indexOf("\n    },", start));
+    const close = body.indexOf("agentLaunchPage.close()");
+    expect(close).toBeGreaterThan(-1);
+    expect(body.indexOf(invocation)).toBeGreaterThan(close);
+  });
   const source = readFileSync("src/ui/app.tsx", "utf8");
 
   // Inverted, not deleted: it pinned the surface Quick Launch replaced, and it
@@ -310,8 +323,10 @@ describe("task launcher mount", () => {
   it("shares one task-operation lock across both launcher surfaces and every Board entry", () => {
     expect(source).toContain("function runTaskOperation(");
     expect(source).toContain("externalPending={taskOperationPending.value}");
-    expect(source).toContain("onOpenWorkspace={openTaskBoard}");
+    // `New Workspace` left the frame row for the rail (DL-27.14), so the lock
+    // reaches it through the rail's `legacy` object rather than a JSX prop.
     expect(source).toContain("onOpenWorkspace: openTaskBoard");
+    expect(source).toContain("openWorkspaceDisabled: taskOperationPending.value !== null");
   });
 
   it("withdraws retry when TabManager no longer owns the original pane", () => {

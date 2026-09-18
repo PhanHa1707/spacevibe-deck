@@ -138,6 +138,19 @@ describe("TabStrip mounted outside the tab bar (sidebar layout)", () => {
     [...host.querySelectorAll<HTMLElement>(".tab")].find(
       (el) => el.querySelector(".tab__label")?.textContent === name,
     )!;
+  it("selects the active chip after dismissing a transient launcher", () => {
+    tabViews.value = [tab()];
+    const calls: string[] = [];
+    mount({
+      transientPageOpen: true,
+      onBeforeSelect: () => calls.push("dismiss"),
+      onSelectTab: () => calls.push("select"),
+    });
+    act(() => chipNamed("Tab").click());
+    expect(calls).toEqual(["dismiss", "select"]);
+    expect(host.querySelectorAll('[role="tab"]')).toHaveLength(1);
+  });
+
   it("reorders mounted terminal chips from mouse pointer events", () => {
     tabViews.value = [
       tab({ key: 1, openedAt: 1, name: "First" }),

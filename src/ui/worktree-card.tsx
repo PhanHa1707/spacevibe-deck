@@ -306,10 +306,14 @@ function BareCheckout({
         type="button"
         class="asr-bare"
         data-shell="false"
-        aria-haspopup="menu"
-        aria-expanded={menu.rect !== null}
+        aria-haspopup={actions.onOpenAgentLauncher ? undefined : "menu"}
+        aria-expanded={actions.onOpenAgentLauncher ? undefined : menu.rect !== null}
         aria-label={`New agent in ${where}`}
         onClick={(event) => {
+          if (actions.onOpenAgentLauncher) {
+            actions.onOpenAgentLauncher(group.path);
+            return;
+          }
           menu.toggleAt(event.currentTarget.getBoundingClientRect(), event.currentTarget);
         }}
       >
@@ -372,7 +376,12 @@ function FlatEntries({
           <NewAgentRow
             where={whereOf(project, group)}
             open={menu.rect !== null}
+            opensPage={actions.onOpenAgentLauncher !== undefined}
             onPress={(row) => {
+              if (actions.onOpenAgentLauncher) {
+                actions.onOpenAgentLauncher(group.path);
+                return;
+              }
               menu.toggleAt(row.getBoundingClientRect(), row);
             }}
           />
@@ -471,18 +480,20 @@ function CheckoutMenu({
 function NewAgentRow({
   where,
   open,
+  opensPage = false,
   onPress,
 }: {
   readonly where: string;
   readonly open: boolean;
+  readonly opensPage?: boolean;
   readonly onPress: (row: HTMLButtonElement) => void;
 }) {
   return (
     <button
       type="button"
       class="asr-card__new"
-      aria-haspopup="menu"
-      aria-expanded={open}
+      aria-haspopup={opensPage ? undefined : "menu"}
+      aria-expanded={opensPage ? undefined : open}
       aria-label={`New agent in ${where}`}
       onClick={(event) => {
         onPress(event.currentTarget);
@@ -642,7 +653,12 @@ export function WorktreeCard(props: WorktreeCardProps) {
             <NewAgentRow
               where={whereOf(project, group)}
               open={menu.rect !== null}
+              opensPage={actions.onOpenAgentLauncher !== undefined}
               onPress={(row) => {
+                if (actions.onOpenAgentLauncher) {
+                  actions.onOpenAgentLauncher(group.path);
+                  return;
+                }
                 const card = cardRef.current;
                 menu.toggleAt(
                   card === null ? row.getBoundingClientRect() : card.getBoundingClientRect(),
@@ -659,10 +675,15 @@ export function WorktreeCard(props: WorktreeCardProps) {
           onFocusPane={props.onFocusPane}
           onClosePane={props.onClosePane}
           actionsOpen={menu.rect !== null}
+          opensPage={actions?.onOpenAgentLauncher !== undefined}
           onOpenActions={
             actions === undefined
               ? undefined
               : (trigger) => {
+                  if (actions.onOpenAgentLauncher) {
+                    actions.onOpenAgentLauncher(group.path);
+                    return;
+                  }
                   // Off the CARD's rect, not the `+`'s: both entry points must
                   // put the menu in the same place (spec §8.2).
                   const card = cardRef.current;

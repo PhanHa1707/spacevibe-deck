@@ -40,6 +40,7 @@ import {
   type ManagerCallbacks,
   type TerminalManager,
   type TerminalManagerDeps,
+  type PaneCreationOptions,
 } from "./terminal-manager-types";
 
 // Re-exported so existing consumers (tab-manager.ts, close-coordinator.ts,
@@ -60,6 +61,7 @@ export function createTerminalManager(
   pty: PtyClient = defaultPtyClient,
   deps: TerminalManagerDeps = {},
 ): TerminalManager {
+  let disposed = false;
   let tree: TreeNode | null = null;
   let activeId: number | null = null;
   // Guards the onFocus-driven ack while focusPane runs its own deterministic
@@ -432,27 +434,39 @@ export function createTerminalManager(
    * appends to branch `b`, so a drop on the left or top edge would land on the
    * wrong side — the same reason `adoptIntoActiveTab` above uses it.
    */
-  async function dockNewPaneAt(targetPaneId: number, edge: Edge): Promise<number | null> {
-    if (!tree || !life.isInTree(tree, targetPaneId)) {
-      return null;
-    }
+  function isPaneLaunchable(id: number): boolean {
+    return (
+      !disposed &&
+      life.isInTree(tree, id) &&
+      life.panes.has(id) &&
+      !life.exited.has(id) &&
+      !transferring.has(id)
+    );
+  }
+
+  async function dockNewPaneAt(
+    targetPaneId: number,
+    edge: Edge,
+    options: PaneCreationOptions = {},
+  ): Promise<number | null> {
+    const valid = () =>
+      !disposed &&
+      (options.canCommit === undefined
+        ? life.isInTree(tree, targetPaneId)
+        : isPaneLaunchable(targetPaneId) && options.canCommit());
+    if (!valid()) return null;
     try {
-      // Fresh lookup, not the 2s poll cache — the user may have just cd'd.
-      const cwd = await freshCwd(targetPaneId, pty);
+      const cwd = options.cwd ?? (await freshCwd(targetPaneId, pty));
+      if (!valid()) return null;
       const pane = await life.spawnPane(cwd);
-      if (!tree || !life.isInTree(tree, targetPaneId)) {
-        // Target closed while spawning — drop the new session rather than
-        // dock it somewhere the user never pointed at.
+      if (!valid() || !tree) {
         life.discardPane(pane);
         return null;
       }
       tree = dockNewPane(tree, targetPaneId, pane.id, edge);
-      // Assigned directly rather than through setActive, for the same reason
-      // splitActive does: ratios do not match the just-docked tree until
-      // render() runs.
       activeId = pane.id;
       render();
-      pane.focus();
+      if (options.focus !== false) pane.focus();
       callbacks.onLayoutChange();
       return pane.id;
     } catch (err) {
@@ -508,23 +522,34 @@ export function createTerminalManager(
     callbacks.onLayoutChange();
   }
 
-  async function initFresh(cwd: string | null = null): Promise<void> {
+  async function initFresh(
+    cwd: string | null = null,
+    options: PaneCreationOptions = {},
+  ): Promise<void> {
+    if (disposed || options.canCommit?.() === false) throw new Error("Launch cancelled");
     const pane = await life.spawnPane(cwd);
+    if (disposed || options.canCommit?.() === false) {
+      life.discardPane(pane);
+      throw new Error("Launch cancelled");
+    }
     tree = leaf(pane.id);
     activeId = pane.id;
     render();
-    pane.focus();
+    if (options.focus !== false) pane.focus();
   }
 
   async function initFromLayout(
     layoutNode: SerializedNode,
     cwds: readonly (string | null)[] = [],
+    options: PaneCreationOptions = {},
   ): Promise<void> {
     const total = countLeaves(layoutNode);
     const spawned: Awaited<ReturnType<typeof life.spawnPane>>[] = [];
     try {
       for (let i = 0; i < total; i += 1) {
+        if (disposed || options.canCommit?.() === false) throw new Error("Launch cancelled");
         spawned.push(await life.spawnPane(cwds[i] ?? null));
+        if (disposed || options.canCommit?.() === false) throw new Error("Launch cancelled");
       }
     } catch (err) {
       for (const pane of spawned) {
@@ -538,7 +563,7 @@ export function createTerminalManager(
     );
     activeId = spawned[0]?.id ?? null;
     render();
-    spawned[0]?.focus();
+    if (options.focus !== false) spawned[0]?.focus();
   }
 
   function fileDragOver(x: number, y: number): void {
@@ -649,6 +674,7 @@ export function createTerminalManager(
     },
     splitActive,
     dockNewPaneAt,
+    isPaneLaunchable,
     /**
      * Zoom is why this is not a bare `layout.slotRects()`: the zoom overlay
      * reparents ONE pane over the whole tab while every `.pane-slot` of the
@@ -854,6 +880,7 @@ export function createTerminalManager(
     fileDragLeave,
     fileDrop,
     dispose() {
+      disposed = true;
       paneDrag.dispose();
       layout.unzoom();
       life.killAll();
