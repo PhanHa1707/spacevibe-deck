@@ -365,9 +365,7 @@ function WorktreeCardRail(props: AgentRailProps) {
           {view.stream.map((group) => {
             const collapsed = collapsedGroupKeys.value.has(group.key);
             const iconPath =
-              group.worktrees[0]?.repositoryPath ??
-              group.worktrees[0]?.path ??
-              group.path;
+              group.worktrees[0]?.repositoryPath ?? group.worktrees[0]?.path ?? group.path;
             // A LIVE cluster is one with something OPEN in it — the old
             // `rows.length > 0` question, asked of the tab indexes the header's
             // ✕ would close. Not `worktrees.length`: since

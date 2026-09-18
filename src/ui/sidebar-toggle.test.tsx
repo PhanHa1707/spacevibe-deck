@@ -91,7 +91,11 @@ describe("SidebarToggle", () => {
   });
 
   it("keeps the version label for a packaged build", () => {
-    initializeDesktopEnvironment({ platform: "macos", homeDir: "/Users/dev", isDevelopment: false });
+    initializeDesktopEnvironment({
+      platform: "macos",
+      homeDir: "/Users/dev",
+      isDevelopment: false,
+    });
     appVersion.value = "1.2.0";
     act(() => render(<SidebarFrameActions collapsed={false} onToggle={vi.fn()} />, host));
     expect(host.querySelector(".sidebar-brand__dev")).toBeNull();
