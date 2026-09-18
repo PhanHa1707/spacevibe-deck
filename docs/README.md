@@ -42,6 +42,8 @@ tense; anything about the frozen Tauri host says so.
 
 ## Elsewhere
 
+- [Public user documentation website](https://linear.app/mxrsv/issue/DECK-126) — feature plan
+  and acceptance criteria.
 - [`DESIGN-LANGUAGE.md`](DESIGN-LANGUAGE.md) — the numbered visual rules cited from code and
   enforced by `scripts/design-language.test.ts`. It stays at this path because the test
   reads it.
