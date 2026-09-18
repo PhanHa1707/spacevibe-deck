@@ -5,7 +5,7 @@ User-facing release notes. The release workflow's `promote` job publishes the
 platform-limitations header), so each section is written for users, reviewed in
 the release PR, and frozen at the tag — never an auto-generated commit list.
 
-## Unreleased
+## 2.0.0
 
 ### Feedback
 
