@@ -32,6 +32,12 @@ const ALLOWED_SVG: ReadonlyMap<string, number> = new Map([
   // The agent-pending ring: ticks positioned by hand and spun by CSS. No
   // library icon expresses it, and it is a status visual, not an action.
   ["ui/workspace-spinner.tsx", 1],
+  // The single-colour agent marks, inlined by design review F1 (2026-09-18).
+  // Their assets are `fill="#fff"`, so as an `<img>` they vanished on the light
+  // theme; an inline `<svg fill="currentColor">` follows the chrome tone
+  // (DL-2.2) without a `filter` (DL-1.3). Brand marks, not action icons.
+  ["lib/agent-logos.ts", 1],
+  ["ui/controls/agent-glyph.tsx", 1],
 ]);
 
 /**
@@ -80,7 +86,13 @@ const GLYPH_EXEMPT = (path: string): boolean =>
   // reaches no bundle (R7 plus `gallery-entry.test.ts`), but the scan reads
   // every source file, so the record of the review needs the same exemption
   // as the thing it produced.
-  path === "gallery/sections/strip-actions-variants.tsx";
+  path === "gallery/sections/strip-actions-variants.tsx" ||
+  // The parked 2026-09-18 before/after record. Its `×` occurs only inside
+  // `note="..."` prose describing the DL-27.25 `×N` count ("the segment, the
+  // ×2 and the open row"), never as a control — the specimens draw their own
+  // chrome. Parked out of the registry like `strip-actions-variants.tsx`
+  // above, and exempted on the same grounds.
+  path === "gallery/sections/before-after-2026-09-18.tsx";
 
 function sourceFiles(dir = SOURCE_ROOT): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -112,7 +124,7 @@ describe("icon system", () => {
     expect(files.length).toBeGreaterThan(50);
   });
 
-  it("authors no SVG outside the two documented exceptions", () => {
+  it("authors no SVG outside the documented exceptions", () => {
     const drawn = files
       .map(({ path, text }) => ({
         path,

@@ -532,7 +532,6 @@ export function createTabManager(
       const panes: readonly PaneView[] = paneIds.map((id) => {
         const snap = tracker.snapshot(id);
         const live = explicitAgent(poller.infoFor(id));
-        tab.manager.setPaneWorking(id, live !== null && snap?.phase === "working");
         // An agent that ENDED keeps its name on the projection until the end
         // is acknowledged (stage 0, 2026-09-03): the poller says "shell" the
         // moment the agent leaves the foreground, and a row with no agent is

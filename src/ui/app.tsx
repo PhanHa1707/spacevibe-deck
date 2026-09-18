@@ -39,7 +39,6 @@ import { agentOptions, agentProcessMatchers, probeNames } from "../lib/agent-cat
 import { resolveTheme } from "../settings/themes";
 import { isShortcutAction } from "../terminal/keymap";
 import { createTabManager, type TabManager } from "../terminal/tab-manager";
-import { pingPane } from "../terminal/pane-ping";
 import { activeTabIndex, tabViews } from "../terminal/tabs-store";
 import { presetsData, savePreset } from "../presets/presets-store";
 import { recordWorkspaceOpen, removeWorkspaceRecents } from "../open-board/workspaces-store";
@@ -376,10 +375,6 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
    * `activateForAttention`, which activates exactly this pane and acks only
    * it, never `focusNextAttention`, which would pick the loudest pane in the
    * window instead of the one that was pressed.
-   *
-   * The 1.5s locator follows the focus in the same synchronous tick: the rail
-   * has just dropped the user into a grid of identical panes, and without an
-   * answer they have to re-find the thing they asked for (DL-18.11).
    */
   const focusRailPane = (index: number, paneId: number): void => {
     runAttentionFocus({
@@ -400,7 +395,6 @@ export function App({ boot = { kind: "normal" } }: { boot?: BootMode } = {}) {
       },
       focusAttention: () => {
         tabsRef.current?.activateForAttention(index, paneId);
-        pingPane(paneId);
       },
     });
   };

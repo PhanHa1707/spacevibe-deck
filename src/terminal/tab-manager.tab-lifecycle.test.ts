@@ -255,7 +255,9 @@ describe("createTabManager workspace identity", () => {
       const shellPane = document.querySelector<HTMLElement>(
         '.pane-slot[data-pane-id="2"] > .pane__term',
       );
-      expect(agentPane?.classList.contains("is-agent-working")).toBe(true);
+      expect(agentPane).not.toBeNull();
+      expect(shellPane).not.toBeNull();
+      expect(agentPane?.classList.contains("is-agent-working")).toBe(false);
       expect(shellPane?.classList.contains("is-agent-working")).toBe(false);
 
       expect(tabViews.value[0].panes).toEqual([
@@ -321,6 +323,7 @@ describe("createTabManager workspace identity", () => {
       expect(tabViews.value[0].panes?.[1].attention).toBe("none");
 
       pty.emitOutput(1, "done.\x1b]9;4;0\x07");
+      expect(tabViews.value[0].panes?.[0].phase).toBe("idle");
       expect(agentPane?.classList.contains("is-agent-working")).toBe(false);
 
       tm.dispose();

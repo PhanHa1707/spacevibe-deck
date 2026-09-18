@@ -460,47 +460,13 @@ describe("design-language feature glyph treatment", () => {
   });
 });
 
-describe("active pane focus current", () => {
-  it("loops the yellow current while the focused agent is working", () => {
+describe("pane activity chrome", () => {
+  it("keeps working and rail-focus top-edge overlays removed", () => {
     const css = readStylesheet().replace(CSS_COMMENT, "");
-    const base = css.match(/\.pane\.is-agent-working::before\s*\{([^}]*)\}/)?.[1] ?? "";
-    const current = css.match(/\.pane\.is-agent-working::after\s*\{([^}]*)\}/)?.[1] ?? "";
-
-    expect(css).toMatch(/--pane-focus-current-duration:\s*1500ms\s*;/);
-    expect(css).not.toMatch(/\.is-active \.pane\.is-agent-working::before/);
-    expect(base).not.toMatch(/animation\s*:/);
-    expect(current).toMatch(
-      /animation:\s*pane-focus-current var\(--pane-focus-current-duration\) linear infinite\s*;/,
-    );
-  });
-
-  it("runs a sidebar-click locator once for 1.5s", () => {
-    const css = readStylesheet().replace(CSS_COMMENT, "");
-    const paneSlot = css.match(/\.pane-slot\s*\{([^}]*)\}/)?.[1] ?? "";
-    const locator = css.match(/\.pane-ping\s*\{([^}]*)\}/)?.[1] ?? "";
-    const locatorCurrents = [...css.matchAll(/\.pane-ping::after\s*\{([^}]*)\}/g)].map(
-      (match) => match[1],
-    );
-
-    expect(paneSlot).toMatch(/position:\s*relative\s*;/);
-    expect(locator).toMatch(
-      /animation:\s*pane-ping-line var\(--pane-focus-current-duration\) linear 1 both\s*;/,
-    );
-    expect(
-      locatorCurrents.some((body) =>
-        /animation:\s*pane-focus-current var\(--pane-focus-current-duration\) linear 1 both\s*;/.test(
-          body,
-        ),
-      ),
-    ).toBe(true);
-  });
-
-  it("freezes working to a static line and removes the locator for reduced motion", () => {
-    const css = readStylesheet().replace(CSS_COMMENT, "");
-
-    expect(css).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.pane\.is-agent-working::after,[\s\S]*?\.pane-ping\s*\{[^}]*animation:\s*none\s*;[^}]*opacity:\s*0\s*;/,
-    );
+    expect(css).not.toContain(".pane.is-agent-working");
+    expect(css).not.toContain(".pane-ping");
+    expect(css).not.toContain("pane-focus-current");
+    expect(css).not.toContain("pane-ping-line");
   });
 });
 

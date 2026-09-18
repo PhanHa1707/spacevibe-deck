@@ -461,20 +461,14 @@
 /* ── Pane ────────────────────────────────────────────────── */
 
 .pane-slot {
-  /* Local containing block for the rail-click locator. Without this,
-     `.pane-ping { position: absolute }` climbs to the tab/stage ancestor and
-     draws across the top of the whole tab instead of this exact pane. */
   position: relative;
   display: flex;
   flex: 1 1 0;
-  /* Same corner as the pane it holds (DL-18.12): `pingPane` appends
-     `.pane-ping` to the SLOT, not to the pane, so the locator's 2px line would
-     otherwise draw square ends out over the gutter where the pane's curve has
-     already receded. */
-  border-radius: var(--radius-tab);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  /* Match the pane card corner (DL-18.12). */
+  border-radius: var(--radius-tab);
 }
 
 .pane {
@@ -486,12 +480,9 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--bg);
-}
   /* 6px (owner, 2026-09-18). The existing `overflow: hidden` is what makes it
      visible: xterm's canvases fill the pane and would otherwise paint over the
-     rounded corners, and the same clip keeps `.is-agent-working`'s own
-     top-edge overlays inside the curve. `.pane-ping` is NOT one of them — it
-     hangs off `.pane-slot`, which carries the matching radius above. */
+     rounded corners. */
   border-radius: var(--radius-tab);
   /* The card's own edge, added the same day the gutter was: `--sidebar-bg` is
      only a few luminance units off `--bg`, so on a dark theme the gutter alone
@@ -505,118 +496,6 @@
      The 1px costs the terminal nothing — the grid re-fits to the padding box
      and a cell is never that small. */
   border: 1px solid var(--seam-split);
-
-/* The pane's two yellow signals share one visual language but not one life:
-   a rail click appends `.pane-ping` for a single 1.5s locator; any pane whose
-   agent is working keeps the current cycling until the tracker stops.
-   It used to be a full inset ring, and the ring was the problem: three of its
-   four sides landed on top of something else — the pane bar covered the top,
-   the splits covered both flanks — so the only side standing on open ground
-   was the BOTTOM one, and a lone accent line floating above the empty tail of
-   a terminal reads as a rendering artefact, not as "this pane has the keys".
-   The owner asked about it twice before it was touched.
-
-   Both use the TOP edge instead. They are overlays, not borders: `.pane` is a
-   flex child sized by the split, so a border would take pixels off the
-   terminal and cost a PTY resize every time a signal appeared.
-
-   z-index 12 because xterm's own layers run to 11 inside `.pane`, and neither
-   `.pane-slot` nor `.pane` opens a stacking context, so an `auto` line would
-   paint under the terminal. */
-.pane.is-agent-working::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  z-index: 12;
-  background: color-mix(in srgb, var(--yellow) 72%, transparent);
-  pointer-events: none;
-}
-
-/* The rail-click locator exists independently of `working`: selecting an idle
-   agent still identifies where focus landed. It replaces its DOM node on each
-   click, so the one-shot animation always restarts without a timer. */
-.pane-ping {
-  position: absolute;
-  inset: 0 0 auto 0;
-  z-index: 13;
-  height: 2px;
-  background: color-mix(in srgb, var(--yellow) 72%, transparent);
-  opacity: 0;
-  pointer-events: none;
-  animation: pane-ping-line var(--pane-focus-current-duration) linear 1 both;
-}
-
-/* Ghostty-style charge: two bright packets cross either the working line or
-   the one-shot locator. Only transform and opacity animate, so terminal
-   geometry and paint order stay fixed while the current travels. */
-.pane.is-agent-working::after,
-.pane-ping::after {
-  content: "";
-  position: absolute;
-  inset: 0 auto auto 0;
-  z-index: 13;
-  width: 48%;
-  height: 3px;
-  background: linear-gradient(
-    90deg,
-    transparent 0 8%,
-    color-mix(in srgb, var(--yellow) 42%, transparent) 14%,
-    var(--yellow) 19%,
-    color-mix(in srgb, var(--yellow) 58%, var(--tone)) 22%,
-    var(--yellow) 25%,
-    transparent 31% 62%,
-    color-mix(in srgb, var(--yellow) 40%, transparent) 68%,
-    var(--yellow) 74%,
-    transparent 82% 100%
-  );
-  pointer-events: none;
-}
-
-.pane.is-agent-working::after {
-  animation: pane-focus-current var(--pane-focus-current-duration) linear infinite;
-}
-
-.pane-ping::after {
-  animation: pane-focus-current var(--pane-focus-current-duration) linear 1 both;
-}
-
-@keyframes pane-ping-line {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  7% {
-    opacity: 1;
-  }
-  74% {
-    opacity: 0.72;
-  }
-}
-
-@keyframes pane-focus-current {
-  0% {
-    opacity: 0;
-    transform: translateX(-110%);
-  }
-  6% {
-    opacity: 1;
-  }
-  70% {
-    opacity: 0.96;
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(310%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pane.is-agent-working::after,
-  .pane-ping {
-    animation: none;
-    opacity: 0;
-  }
 }
 
 .pane__bar {

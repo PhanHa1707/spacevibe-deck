@@ -67,8 +67,9 @@ turned down and why — a fork nobody can reconstruct is a decision that will be
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run dev`                 | browser-only Vite preview; IPC operations fail soft                                                                                                                     |
 | `npm run tauri dev`           | the Tauri host                                                                                                                                                          |
-| `npm run electron:dev`        | the Electron host, built and launched from `dist-electron/`                                                                                                             |
-| `npm run electron:dev:watch`  | same host with hot reload: renderer on the Vite dev server, main rebuilds and relaunches on save via [`scripts/electron-dev-watch.mjs`](scripts/electron-dev-watch.mjs) |
+| `npm run electron:dev`        | Electron dev with renderer HMR and incremental main/preload rebuilds via [`scripts/electron-dev-watch.mjs`](scripts/electron-dev-watch.mjs) |
+| `npm run electron:dev:watch`  | alias for `electron:dev` |
+| `npm run electron:dev:once`   | build and launch once from the static renderer bundle through [`scripts/electron-dev-launch.mjs`](scripts/electron-dev-launch.mjs) |
 | `npm run electron:build`      | typecheck and bundle the Electron main process                                                                                                                          |
 | `npm run electron:package`    | package the Electron host as a local **unsigned** `Deck Electron.app` (arm64, `dir` target, no installer/updater/publish) into `dist-electron-app/`                     |
 | `npm run electron:smoke`      | headed smoke test; needs a display server and a real PTY                                                                                                                |

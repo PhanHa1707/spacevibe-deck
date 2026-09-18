@@ -178,9 +178,6 @@
      and still inside DL-1.2's 300ms ceiling. */
   --duration: 150ms;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
-  /* DL-18.11: one cycle of the shared pane current. A rail-click locator runs
-     it once; a focused working agent repeats it until the tracker stops. */
-  --pane-focus-current-duration: 1500ms;
 }
 
 /* Flat design rule: no drop shadows anywhere in this file.

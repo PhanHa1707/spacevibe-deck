@@ -36,25 +36,19 @@ constraint: **consume as few machine resources as possible.**
 - **DL-1.2** Animate only `transform`, `opacity`, `color`, `border-color`,
   `background-color`. Max duration 300ms. No infinite / looping animations.
   Nothing animates while the user is idle.
-  **The first exception this rule carried was withdrawn (2026-08-17).** From
-  2026-08-16 the focus ping was allowed 1500ms as a locator (DL-27.7); the
-  owner then deleted the ping outright — a rail click moves focus and says
-  nothing else. **One new scoped exception was added 2026-08-19 by DL-18.11:**
-  a rail click runs one 1500ms locator, while each recognised working agent
-  repeats that same 1500ms current until its tracker stops. The latter is an
-  infinite CSS animation only while `.is-agent-working` exists — the state
-  removal ends it, and nothing moves while the agent is idle.
-  **A second scoped exception was added 2026-08-25 by DL-27.3:** the rail's
+  **Pane top-edge motion was removed on 2026-09-18 (DL-18.11).** Neither
+  agent activity nor rail selection draws a yellow line over the terminal
+  ([pane styles](../src/styles/06-stage-panes.css)).
+  **A scoped exception was added 2026-08-25 by DL-27.3:** the rail's
   `asked` mark radiates on a 1.8s loop for as long as that state is on the
-  element. It is the same shape as the one above — infinite only while a state
-  exists, `transform` and `opacity` only — with one difference stated rather
-  than glossed: "nothing animates while the user is idle" does NOT hold for it,
+  element. It uses only `transform` and `opacity` and loops only while that
+  state exists. "Nothing animates while the user is idle" does NOT hold for it,
   because an unread mark exists precisely while nobody is watching. That is the
   point of the mark and the whole cost of the exception; it was taken knowingly,
   over a still ring that separates the mark in a screenshot but not in the
   corner of an eye. The still ring is what `prefers-reduced-motion: reduce`
   gets.
-  **A third scoped exception was added 2026-08-27 by DL-27.25:** an Electron
+  **Another scoped exception was added 2026-08-27 by DL-27.25:** an Electron
   worktree-card row or strip carries three `transform: scaleY` bars while its
   agent is working (DECK-30, amended 2026-09-09). The 6/10/8px bars share a
   900ms alternate cycle with a 150ms stagger; there is no beam. Leaving working
@@ -114,11 +108,12 @@ from the active terminal theme (`--bg --fg --accent --red --green --yellow
   **One exception, added 2026-08-19:** a background somebody has hand-picked a
   sidebar for may pin it, as a literal keyed by that background
   ([`PINNED_SIDEBAR_BG`](../src/lib/derive-colors.ts) `current`). Deck's own
-  `#17181c` pins `#161b22` at the owner's request (`#272d31` until 2026-08-25),
-  because that gray is not reachable by mixing the background toward white — a
-  lift raises every channel, and this one drops red while raising blue. The pin is keyed on the background rather than on the
-  preset so the rule above still holds for all four callers, and so overriding
-  that background correctly drops the pin.
+  dark mode uses a neutral-black `#0a0a0a` pane and a lighter `#141414`
+  sidebar (2026-09-18, owner's direction); bars and popovers rise from that
+  sidebar through the existing chrome steps. The former `#17181c` → `#161b22`
+  pin remains for legacy background overrides. Each pin is keyed on the
+  background rather than the preset so all four callers agree, and overriding
+  the background correctly drops its pin.
 - **DL-2.3** **A boundary between two surfaces is a seam, not a hairline.**
   Seams mix from `--tone`, never from `--fg`: a boundary belongs to the
   background ladder, and mixing from the foreground let the terminal's text hue
@@ -176,17 +171,11 @@ from the active terminal theme (`--bg --fg --accent --red --green --yellow
 
 - **DL-3.1** `--accent` marks **interactive or active** only: hover/focus
   borders, focus ring, active markers, affordance hints. Never a decorative
-  fill, never large areas. **DL-18.11 is one scoped exception:** pane activity
-  and the rail's pane locator use `--yellow`, not `--accent`; neither becomes
-  Deck's general focus colour.
+  fill, never large areas.
 - **DL-3.2** `--green` means only _on / enabled / success_. `--red` means only
   _danger / destructive / error_. `--yellow` means only _needs your eyes_ —
   attention a person must act on, one step below `--red`'s failure.
   Never decoration, none of the three.
-  **Amended 2026-08-19 by DL-18.11:** a working agent may spend yellow until it
-  stops, and a rail click may spend it on one 1500ms pane locator. These are
-  activity/navigation signals, not persistent focus state; buttons, fields
-  and every other focus ring remain accent.
   `--yellow` was **added 2026-08-16** with the agent status rail (DL-27.6),
   and **widened later the same day** (owner): it covers a finished run nobody
   has checked as well as a question or a permission wait — the rail's old
@@ -946,7 +935,7 @@ answered here rather than re-argued per button.
   presentation is set: `color="currentColor"`, the weight, `aria-hidden`,
   `focusable="false"`, plus the unconditional `deck-icon`
   class the stylesheet's one icon rule hangs off. Icons are imported by name.
-  The rail's project `Folder` uses the surface-scoped `filled` prop in
+  The rail's fallback project `Folder` uses the surface-scoped `filled` prop in
   [both live and remembered headers](../src/ui/agent-rail.tsx) (DL-27.17).
   Nothing else authors an `<svg>`, and no glyph character stands in for an
   action — `scripts/icon-system.test.ts` enforces both.
@@ -1458,14 +1447,21 @@ window's identity and its actions at the same time.
   crossed the edge repeatedly and the cursor flickered with it. Same figures on
   the docked column's seam (DL-19.4) — one gesture, one look, both edges.
 
-  **Amended 2026-08-19 (owner): `New` joins the open column's frame, directly
-  after the hide control.** The two controls form one compact leading cluster
-  ([`SidebarFrameActions`](../src/ui/sidebar-toggle.tsx) `current`); moving the
-  launcher out of the scrolling rail keeps the action visible regardless of
-  how many projects are open. It leaves with the column when the sidebar is
-  hidden, while the one control needed to restore that column still moves to
-  the stage strip. The feature toolbar remains on the stage side; this
-  amendment adds one sidebar action, not a second toolbar.
+  **Amended 2026-09-18 (owner): the hide control and Deck identity share the
+  top row; `New Workspace` occupies the row below.**
+  [`SidebarFrameActions`](../src/ui/sidebar-toggle.tsx) pairs the hide control
+  on the left with the canonical Deck logo, `Deck` label and running version
+  (`V1.2.3`) aligned to the right. The gap remains a window drag region; a
+  narrow sidebar truncates the version, with its full value in a tooltip.
+  Local Electron builds replace the version with an accent-filled `DEV`
+  badge, identified by `isDevelopment` in the validated
+  [desktop environment](../src/lib/platform.ts).
+  A 1px `--hair-strong` bottom border separates this row from navigation in
+  [the shell stylesheet](../src/styles/02-shell.css). The
+  [`AgentRail`](../src/ui/agent-rail.tsx) pins the existing launcher above its
+  project scrollport, preserving click and pane-drag behavior. Both rows leave
+  with the column when hidden; the restore control moves to the stage strip.
+  The feature toolbar remains on the stage side.
 
   **Cross-reference, 2026-09-03, WITHDRAWN 2026-09-09 (DECK-43):** the hidden
   state was briefly PRODUCED by a surface rather than by the user — the Agent
@@ -1550,27 +1546,12 @@ window's identity and its actions at the same time.
   with the sentence). Documents and the browser keep their own names; they
   have no turn to report.
 
-- **DL-18.11** **Rail focus is one yellow current; agent work is the same
-  current until stop (2026-08-19, owner).** These are two distinct triggers.
-  [`pingPane`](../src/terminal/pane-ping.ts) `current` is called only after an
-  Agent Rail row activates its exact pane: it replaces one inert `.pane-ping`
-  node inside that pane's positioned `.pane-slot`, so the shared current spans
-  only that pane's top edge and replays once for 1500ms, including for an idle
-  agent. Ordinary terminal focus, tab selection and attention-keyboard
-  navigation do not trigger that locator; no locator is anchored to the tab.
-
-  Separately, [`syncViews`](../src/terminal/tab-manager.ts) `current` reflects
-  every exact pane's recognised-agent tracker phase as `.is-agent-working`.
-  [`.pane.is-agent-working::after`](../src/styles/06-stage-panes.css) `current`
-  repeats a 1500ms two-packet charge across a 2px yellow base until the tracker
-  removes that class; it does not depend on which pane holds focus, so multiple
-  running agents can each report their own activity and an idle agent or shell
-  cannot keep it alive. Both paths animate only `transform` and `opacity`, take
-  no pointer events and change no pane geometry. Under
-  `prefers-reduced-motion: reduce`, the click locator is absent and a working
-  pane keeps only its static 2px yellow state. These were DL-1.2's only motion
-  exceptions until 2026-08-25, when DL-27.3's unread ripple became the third;
-  they remain the scoped yellow exceptions recorded in DL-3.1/DL-3.2.
+- **DL-18.11** **No pane top-edge activity or focus effect (2026-09-18, owner).**
+  The continuous working line and the one-shot rail-click locator are removed
+  from [pane styles](../src/styles/06-stage-panes.css). No replacement effect
+  is added. [Rail selection](../src/ui/app.tsx) still activates the exact pane;
+  [agent phase and attention](../src/terminal/tab-manager.ts) still supply the
+  existing rail and Board indicators. Pane geometry is unchanged by this removal.
 
 - **DL-18.12** **A pane is a card on the stage gutter (2026-09-18, owner).**
   `--stage-gutter` is 4px and applies to all four edges of the work area AND
@@ -1762,6 +1743,9 @@ direction token rebuild §9.4
   membership (owner, 2026-08-17, with the chips' turn text). Amended
   2026-09-09 (DECK-39): [strip tabs and view buttons](../src/styles/05-tab-bar-toolbar.css)
   use `--radius-tab` (6px); other compact details retain the 2px default.
+  Amended 2026-09-18 (owner): `--radius-tab`'s membership now also covers the
+  stage's panes and document surface (DL-18.12), so the 6px corner is a shared
+  role rather than the strip's private number.
   `--radius-tight` (8px) is anything drawn inside a control or row — marks,
   bars, scrollbar thumbs and miniature parts. `--radius-control` (10px) is
   anything the pointer acts on inside a surface — rows, pills, icon buttons
@@ -1771,9 +1755,6 @@ direction token rebuild §9.4
   its own. The tight role joined the earlier control/surface pair on
   2026-08-16, when surface came down from 16px so the closed scale reads
   8/10/12. A value chosen by feel at a use site is not part of this scale;
-  Amended 2026-09-18 (owner): `--radius-tab`'s membership now also covers the
-  stage's panes and document surface (DL-18.12), so the 6px corner is a shared
-  role rather than the strip's private number.
   `border-radius: 50%` and the 999px capsule stay shapes rather than scale
   values.
 - **DL-20.2** One motion pair for chrome state change: `--duration` (150ms) and
@@ -2348,9 +2329,9 @@ a 1.5s effect. The ping is the inset hairline DL-1.3 explicitly permits.
   read was an accent flash with no obvious cause, and the then-active-pane bar
   (`.pane-slot.is-active .pane::before`, superseded by DL-18.11) already said
   which pane held the keys permanently. The original ring was deleted at that
-  point. `pane-ping.ts` returned on 2026-08-19 for DL-18.11's top-edge yellow
-  line, not this ring, and its current behaviour is governed there. The number
-  is kept here so a future locator does not cite the withdrawn rule.
+  point. The top-edge replacement was also removed on 2026-09-18 under
+  DL-18.11 ([pane styles](../src/styles/06-stage-panes.css)). The number is kept
+  here so a future locator does not cite the withdrawn rule.
 - **DL-27.8** **The selection wash stops at the tab row (amended 2026-08-16).**
   It originally covered the whole item; with DL-27.13's pane tree inside the
   item, that painted the wash over the leaves and their guides, and the owner
@@ -2520,17 +2501,16 @@ a 1.5s effect. The ping is the inset hairline DL-1.3 explicitly permits.
   guides — so the rail shows only agents and projects. This rule, the markup
   and the CSS all stand; restoring the tree is flipping that one constant.
 
-- **DL-27.14** **`New` is the sidebar frame's launcher beside the hide control,
-  and it can also be picked up (2026-08-16; moved into the frame 2026-08-19,
-  owner).** It began as the rail's last row, moved to its first row on
-  2026-08-17, then left the scrolling list entirely: a primary action must not
-  disappear because the project list grew. The rail now starts with live work,
-  while [`SidebarFrameActions`](../src/ui/sidebar-toggle.tsx) `current` owns
-  the compact `toggle → New` cluster. Clicked, `New` opens the board; dragged
-  onto a pane, it docks an agent pane at that pane's nearest edge
-  ([`new-pane-drag.ts`](../src/ui/new-pane-drag.ts) `current`). One control,
-  two verbs, because both answer the same question — "another one, where?" —
-  and a second row would have said the same word twice. The drag reuses the
+- **DL-27.14** **`New Workspace` is pinned below the sidebar identity row, and it can
+  also be picked up (amended 2026-09-18, owner).**
+  [`SidebarFrameActions`](../src/ui/sidebar-toggle.tsx) owns the compact
+  `toggle → logo → Deck` row; [`AgentRail`](../src/ui/agent-rail.tsx) places
+  the same `SidebarNewButton` beneath it, outside the project scrollport,
+  with a 1px `--hair-strong` border in [the shell stylesheet](../src/styles/02-shell.css).
+  Clicked, `New Workspace` opens the board; dragged onto a pane, it docks an agent pane
+  at that pane's nearest edge ([`new-pane-drag.ts`](../src/ui/new-pane-drag.ts)).
+  One control,
+  two verbs, because both answer the same question — "another one, where?". The drag reuses the
   pane drag's own vocabulary exactly: the 5px threshold that separates a click
   from a grab, the `.pane-drag-ghost` label following the cursor, and the
   half-pane `.drop-overlay` naming the edge the drop will take. No new visual
@@ -2602,12 +2582,15 @@ a 1.5s effect. The ping is the inset hairline DL-1.3 explicitly permits.
   route back to running work. The right dock is likewise suppressed while Open
   Board owns the stage, without changing its saved open tab or visibility.
 
-- **DL-27.17** **A project header reads folder → name → trailing caret
-  (2026-08-19, owner).** `Folder` establishes that the group is a workspace;
-  the caret sits at the far edge so expansion is a predictable trailing
-  affordance rather than punctuation before the name. Both glyphs are
+- **DL-27.17** **A project header reads favicon → name → trailing caret
+  (amended 2026-09-18, owner).** The workspace favicon identifies the project;
+  a missing, unreadable or broken image falls back to the filled `Folder`.
+  Favicons come from the existing [workspace scanner](../electron/images.ts),
+  using the repository root or the plain workspace folder.
+  The caret sits at the far edge so expansion is a predictable trailing
+  affordance rather than punctuation before the name. Both images are
   decorative; the button's accessible name carries the expand/collapse action.
-  The folder uses `FEATURE_ICON` (15px) with `filled` in
+  The favicon and fallback use `FEATURE_ICON` (15px), with `filled` for the folder in
   [the header component](../src/ui/agent-rail.tsx). Its 17px column remains
   separate from checkout content; the icon-to-name gap is 6px and the name
   is 14px (DL-27.9), set in [the stylesheet](../src/styles/04a-agent-rail.css).
@@ -2772,9 +2755,8 @@ a 1.5s effect. The ping is the inset hairline DL-1.3 explicitly permits.
   active pane of its own, so the rail model ANDs a pane's focus with its tab's
   selection rather than reporting each tab's local answer, and that invariant
   lives in the pure model where it can be asserted. Selection outranks hover
-  (DL-21.2); the mark spends no `--yellow`, which DL-18.11 keeps for activity
-  and the 1500ms locator — a locator says _look here now_ and this says _the
-  keys are here_. **A document or the browser on the stage does not clear it:**
+  (DL-21.2); the mark spends no `--yellow` and identifies where the keyboard
+  is directed. **A document or the browser on the stage does not clear it:**
   the active pane is unchanged and the mark then reads as where the keyboard
   returns to, where clearing it would blink the rail on every file opened.
 - **DL-27.23** **The rail has three tiers: project, worktree, agent row
