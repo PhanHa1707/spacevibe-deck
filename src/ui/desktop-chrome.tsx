@@ -27,7 +27,7 @@ interface DesktopChromeProps {
   readonly onSidebarCollapsedChange?: (collapsed: boolean) => void;
   /**
    * The sidebar's leading controls, in the frame row immediately after the
-   * traffic lights (DL-18.9). `App` passes the hide control followed by `New`
+   * traffic lights (DL-18.9). `App` passes the hide control followed by the Deck brand
    * only while the column is SHOWN — a hidden column has no frame row, so only
    * the toggle moves to the stage strip.
    */
@@ -89,7 +89,7 @@ export function DesktopChrome(props: DesktopChromeProps) {
         >
           {!windows ? <div class="deck-frame__lights" aria-hidden="true" /> : null}
           {/* Beside the OS buttons, before anything else: the sidebar's hide
-              control and `New` launcher form its leading frame cluster
+              control and Deck brand form its leading frame cluster
               (DL-18.9). */}
           {props.sidebarToggle}
           <div class="deck-frame__spacer" data-tauri-drag-region />

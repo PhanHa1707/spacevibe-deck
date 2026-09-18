@@ -58,7 +58,7 @@ export function agentLimitsFixture(now = Date.now()): AgentLimitsSnapshot {
 
 /** The shipping leading frame cluster, with drag disabled in the gallery. */
 export function sidebarFrameActionsSpecimen(onToggle = NOOP) {
-  return <SidebarFrameActions collapsed={false} onToggle={onToggle} onOpenWorkspace={NOOP} />;
+  return <SidebarFrameActions collapsed={false} onToggle={onToggle} />;
 }
 
 /**

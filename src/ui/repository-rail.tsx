@@ -54,6 +54,7 @@ import { workspacesData } from "../open-board/workspaces-store";
  */
 
 interface RepositoryRailProps {
+  readonly header?: ComponentChildren;
   onSelectTab(index: number): void;
   onCloseTab(index: number): void;
   /**
@@ -346,6 +347,7 @@ export function RepositoryRail(props: RepositoryRailProps) {
 
   return (
     <nav class="wsbar wsbar--repos" aria-label="Repositories">
+      {props.header}
       <div class="wsbar__list" role="tablist" aria-label="Workspace tabs">
         {groups.map((group) =>
           // A folder that is not a repository does not sprout a repository

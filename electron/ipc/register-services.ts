@@ -72,6 +72,7 @@ export function registerServices(deps: RegisterServicesDeps): void {
   ipcMain.handle(CHANNELS.detectAgents, (_event, { names }) => detectAgentsSafely(names ?? []));
   ipcMain.handle(CHANNELS.dirsExist, (_event, { paths }) => dirsExist(paths));
   ipcMain.handle(CHANNELS.desktopEnvironment, () => ({
+    isDevelopment: !app.isPackaged,
     // `homeDir`, not `home`: Rust's struct is `#[serde(rename_all = "camelCase")]`
     // so that has always been the wire key. `platform.ts` rejects anything else,
     // the caller swallows the error, and the app silently falls back to

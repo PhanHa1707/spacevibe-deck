@@ -1,7 +1,10 @@
+import deckLogoUrl from "../../.github/assets/icon.svg";
 import { Plus, SidebarSimple } from "@phosphor-icons/react";
 import { useEffect, useRef } from "preact/hooks";
 import { CHROME_ICON, DeckIcon } from "./controls/deck-icon";
 import { createNewPaneDragController, type NewPaneDropDeps } from "./new-pane-drag";
+import { appVersion } from "../updater/app-version";
+import { getDesktopEnvironment } from "../lib/platform";
 
 interface SidebarToggleProps {
   /** Painted state, not the setting: a live drag arms this before it writes. */
@@ -48,8 +51,8 @@ interface SidebarNewButtonProps {
   readonly newPaneDrop?: NewPaneDropDeps;
 }
 
-/** The sidebar's `New` launcher, now in the frame beside its hide control. */
-function SidebarNewButton({
+/** The pinned launcher below the sidebar identity row (DL-27.14). */
+export function SidebarNewButton({
   disabled = false,
   onOpenWorkspace,
   newPaneDrop,
@@ -81,30 +84,35 @@ function SidebarNewButton({
       class="sidebar-new"
       disabled={disabled}
       title="Open a workspace — or drag onto a pane to add an agent there"
-      aria-label="New"
+      aria-label="New Workspace"
       onClick={onOpenWorkspace}
     >
       <DeckIcon icon={Plus} size={CHROME_ICON} />
-      <span>New</span>
+      <span>New Workspace</span>
     </button>
   );
 }
 
-interface SidebarFrameActionsProps extends SidebarNewButtonProps {
-  readonly collapsed: boolean;
-  onToggle(): void;
-}
-
-/** The compact action cluster immediately after the macOS traffic lights. */
-export function SidebarFrameActions(props: SidebarFrameActionsProps) {
+/** The sidebar identity row, following the native traffic lights (DL-18.9). */
+export function SidebarFrameActions(props: SidebarToggleProps) {
+  const isDevelopment = getDesktopEnvironment().isDevelopment === true;
   return (
     <div class="sidebar-frame-actions">
       <SidebarToggle collapsed={props.collapsed} onToggle={props.onToggle} />
-      <SidebarNewButton
-        disabled={props.disabled}
-        onOpenWorkspace={props.onOpenWorkspace}
-        newPaneDrop={props.newPaneDrop}
-      />
+      <span class="sidebar-frame-actions__spacer" data-tauri-drag-region />
+      <span class="sidebar-brand">
+        <img src={deckLogoUrl} alt="" width={20} height={20} draggable={false} />
+        <span>Deck</span>
+        {isDevelopment ? (
+          <span class="sidebar-brand__dev" title="Local development build">
+            DEV
+          </span>
+        ) : appVersion.value ? (
+          <span class="sidebar-brand__version" title={`Version ${appVersion.value}`}>
+            V{appVersion.value}
+          </span>
+        ) : null}
+      </span>
     </div>
   );
 }
