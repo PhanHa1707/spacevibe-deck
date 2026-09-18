@@ -9,6 +9,8 @@ import type { AdoptResult } from "./pane-adopt";
 import type { TransferClient } from "./transfer-client";
 
 export interface ManagerCallbacks {
+  /** A genuine input write reached this pane, excluding terminal protocol replies. */
+  onPaneInput?(id: number): void;
   /** Fired after any structural change (split, close, ratio commit). */
   onLayoutChange(): void;
   /** Fired when a pane requests attention (OSC 9/777 notification or bell). */

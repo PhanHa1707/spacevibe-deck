@@ -96,6 +96,9 @@ export function createTerminalManager(
         callbacks.onPaneFocus?.(id);
       }
     },
+    onUserInput(id) {
+      callbacks.onPaneInput?.(id);
+    },
     onAttentionSignal(id, signal) {
       callbacks.onAttentionSignal?.(id, signal);
     },
@@ -745,7 +748,7 @@ export function createTerminalManager(
       if (!life.panes.has(id) || life.exited.has(id)) {
         return null;
       }
-      return life.enqueueWrite(id, "\r");
+      return life.enqueueWrite(id, "\r", true);
     },
     serializePane(id, lines) {
       const pane = life.panes.get(id);

@@ -99,7 +99,7 @@ export function fakePane(
       selected = false;
     },
     paste: overrides.paste ?? (() => {}),
-    pasteText: overrides.pasteText ?? ((text: string) => events.onData(id, text)),
+    pasteText: overrides.pasteText ?? ((text: string) => events.onData(id, text, true)),
     scrollPage() {},
     scrollToEdge() {},
     focus() {

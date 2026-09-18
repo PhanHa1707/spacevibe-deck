@@ -182,6 +182,10 @@ export interface AttentionCandidate {
 }
 
 export interface AgentAttentionTracker {
+  /** A shell launch is not a prompt; keep later input across the first poll. */
+  noteLaunch(id: number): void;
+  /** Genuine keyboard/paste input delivered to the pane, never terminal replies. */
+  noteInput(id: number): boolean;
   /** Feed one ordered activity transition. Gated by the recognised process. */
   noteActivity(id: number, transition: ActivityTransition): PaneAttentionSnapshot | null;
   /** Feed one OSC-notification/bell signal. Gated by the recognised process. */
@@ -260,6 +264,8 @@ export interface AgentAttentionTracker {
 
 /** Internal per-pane record. Treated immutably: reducers return fresh copies. */
 interface PaneState {
+  readonly inputSinceLaunch: boolean;
+  readonly awaitingLaunch: boolean;
   readonly processSessionPid: number | null;
   readonly processSessionId: string | null;
   readonly codexLifecycle: CodexLifecycle | null;
@@ -315,6 +321,8 @@ const TAB_KIND_BY_RANK: readonly TabAttentionKind[] = [
 
 function freshState(): PaneState {
   return {
+    inputSinceLaunch: false,
+    awaitingLaunch: false,
     processSessionPid: null,
     processSessionId: null,
     codexLifecycle: null,
@@ -543,6 +551,7 @@ export function createAgentAttentionTracker(
       return false;
     }
     if (transition.source === "output-heuristic") {
+      if (s.agentLabel === "codex" && !s.inputSinceLaunch) return false;
       const evidenceStartedAt = transition.evidenceStartedAt ?? transition.observedAt;
       if (evidenceStartedAt < s.gateOpenedAt) {
         return false;
@@ -716,6 +725,18 @@ export function createAgentAttentionTracker(
   }
 
   return {
+    noteLaunch(id) {
+      const prev = panes.get(id) ?? freshState();
+      panes.set(id, { ...prev, inputSinceLaunch: false, awaitingLaunch: true });
+    },
+    noteInput(id) {
+      const prev = panes.get(id);
+      if (prev !== undefined && (prev.isAgent || prev.awaitingLaunch)) {
+        panes.set(id, { ...prev, inputSinceLaunch: true });
+        return !prev.inputSinceLaunch;
+      }
+      return false;
+    },
     noteActivity(id, transition) {
       const prev = panes.get(id);
       if (prev === undefined) {
@@ -762,7 +783,14 @@ export function createAgentAttentionTracker(
 
       let candidate: PaneState;
       if (isAgent) {
-        const seeded = seededPhase(seed);
+        const seeded =
+          process === "codex" &&
+          prev.awaitingLaunch &&
+          prev.inputSinceLaunch &&
+          seed?.source === "output-heuristic" &&
+          seed.phase === "working"
+            ? { phase: "working" as const, phaseConfidence: "inferred" as const, hasRun: true }
+            : seededPhase(seed);
         if (prev.isAgent && prev.lastProcess !== process) {
           // agent → agent (different label): reset generation + signal-derived
           // attention + evidence, open a fresh gate, infer no completion.
@@ -770,6 +798,8 @@ export function createAgentAttentionTracker(
           candidate = {
             ...prev,
             ...seeded,
+            inputSinceLaunch: prev.awaitingLaunch && prev.inputSinceLaunch,
+            awaitingLaunch: false,
             attention: "none",
             source: null,
             confidence: "explicit",
@@ -798,6 +828,8 @@ export function createAgentAttentionTracker(
           candidate = {
             ...prev,
             ...seeded,
+            inputSinceLaunch: prev.awaitingLaunch && prev.inputSinceLaunch,
+            awaitingLaunch: false,
             exitCode: null,
             agentLabel: process,
             // A new occupant has no session yet, whatever the last one ran —
@@ -824,6 +856,8 @@ export function createAgentAttentionTracker(
         // live agent; see `endedAgent`.
         candidate = {
           ...endedAgent(prev),
+          inputSinceLaunch: false,
+          awaitingLaunch: false,
           codexLifecycle: null,
           isAgent: false,
           hasProcess: true,
@@ -850,6 +884,8 @@ export function createAgentAttentionTracker(
       const candidate: PaneState = {
         ...(prev.isAgent ? endedAgent(prev) : prev),
         phase: "exited",
+        inputSinceLaunch: false,
+        awaitingLaunch: false,
         codexLifecycle: null,
         phaseConfidence: "explicit",
         exitCode: typeof exitCode === "number" && Number.isFinite(exitCode) ? exitCode : null,
@@ -863,12 +899,40 @@ export function createAgentAttentionTracker(
       const prev = panes.get(id);
       if (prev === undefined || !prev.isAgent || prev.agentLabel !== "codex") return null;
       const replaced = prev.processSessionPid !== null && prev.processSessionPid !== pid;
+      const incomingContract =
+        prev.sessionId !== null &&
+        (sessionId === null || prev.sessionId === sessionId) &&
+        prev.processSessionId !== prev.sessionId &&
+        prev.phaseFromContract;
       const withdrawn = prev.processSessionId !== null && prev.sessionId === prev.processSessionId;
       return commit(id, prev, {
         ...prev,
+        ...(replaced
+          ? {
+              inputSinceLaunch: prev.awaitingLaunch && prev.inputSinceLaunch,
+              awaitingLaunch: false,
+            }
+          : {}),
+        ...(replaced && !incomingContract
+          ? {
+              ...seededPhase(undefined),
+              attention: "none" as const,
+              source: null,
+              confidence: "explicit" as const,
+              inputSinceLaunch: prev.awaitingLaunch && prev.inputSinceLaunch,
+              awaitingLaunch: false,
+              gateOpenedAt: now(),
+              codexLifecycle: null,
+              contractAt: null,
+              phaseFromContract: false,
+              detail: null,
+            }
+          : {}),
         processSessionPid: pid,
         processSessionId: sessionId,
-        sessionId: sessionId ?? (replaced || withdrawn ? null : prev.sessionId),
+        sessionId:
+          sessionId ??
+          (incomingContract ? prev.sessionId : replaced || withdrawn ? null : prev.sessionId),
       });
     },
 

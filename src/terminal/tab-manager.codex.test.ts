@@ -152,6 +152,8 @@ describe("Codex card lifecycle", () => {
       emit("Stop");
       settings.value = DEFAULT_SETTINGS;
       await vi.advanceTimersByTimeAsync(2000);
+      await tm.injectIntoPane(1, "Actual prompt", { autoSend: false, expectedAgent: "codex" });
+      await vi.advanceTimersByTimeAsync(400);
       pty.emitOutput(1, "new output");
       await vi.advanceTimersByTimeAsync(500);
       pty.emitOutput(1, "more output");

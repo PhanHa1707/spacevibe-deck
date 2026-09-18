@@ -292,6 +292,7 @@ export function createTabManager(
       reportAgentLaunchTimeout(WINDOWS_AGENT_TIMEOUT_MESSAGE);
     },
     onFire: (id) => {
+      tracker.noteLaunch(id);
       // The startup blind window (trust audit §4.5): the attention gate opens
       // on the poll that first finds the agent in the foreground, and the
       // recurring poll runs every 2 s. An agent that starts working — or
@@ -490,10 +491,7 @@ export function createTabManager(
         const agent = explicitAgent(poller.infoFor(id));
         const snap = tracker.snapshot(id);
         return (
-          agent !== null &&
-          (agent === "codex" && snap?.sessionId != null
-            ? snap.phase === "working"
-            : activity.working(id))
+          agent !== null && (agent === "codex" ? snap?.phase === "working" : activity.working(id))
         );
       });
       // The per-pane projection the agent rail's chips and expanded rows both
@@ -715,6 +713,9 @@ export function createTabManager(
   }
 
   const callbacks = {
+    onPaneInput(id: number): void {
+      if (tracker.noteInput(id)) activity.noteInput(id, true);
+    },
     onLayoutChange(): void {
       syncViews();
       const live = allPaneIds();
@@ -1783,6 +1784,7 @@ export function createTabManager(
       ) {
         return false;
       }
+      tracker.noteLaunch(paneId);
       await paneIo.writePty(paneId, `${prepared.command}\r`);
       if (agent === "claude" && sessionId !== null) {
         tracker.noteMintedSession(paneId, sessionId);

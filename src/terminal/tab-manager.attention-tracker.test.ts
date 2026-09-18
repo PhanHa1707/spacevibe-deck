@@ -456,6 +456,36 @@ describe("createTabManager attention tracker", () => {
       }
     });
 
+    it("keeps startup idle without an identity, then detects the first pasted prompt", async () => {
+      vi.useFakeTimers();
+      const infos = new Map([[1, processInfo(1, "/repo", "codex", "agent", "codex")]]);
+      const { tm, pty } = setup({ infos });
+      try {
+        await tm.openFromPreset({ type: "leaf" }, ["/repo"], { workspacePath: "/repo" });
+        await tm.init();
+        await vi.advanceTimersByTimeAsync(0);
+        for (let i = 0; i < 20; i++) {
+          pty.emitOutput(1, "startup repaint");
+          await vi.advanceTimersByTimeAsync(200);
+          expect(tabViews.value[0].panes?.[0].hasRun).toBe(false);
+          expect(tabViews.value[0].agentBusy).toBe(false);
+        }
+        expect(
+          await tm.injectIntoPane(1, "first prompt", { autoSend: false, expectedAgent: "codex" }),
+        ).toBe("pasted");
+        await vi.advanceTimersByTimeAsync(400);
+        pty.emitOutput(1, "own reply starts");
+        await vi.advanceTimersByTimeAsync(500);
+        pty.emitOutput(1, "own reply continues");
+        expect(tabViews.value[0].attention?.kind).toBe("working");
+        await vi.advanceTimersByTimeAsync(3400);
+        expect(tabViews.value[0].attention?.kind).toBe("completed");
+      } finally {
+        tm.dispose();
+        vi.useRealTimers();
+      }
+    });
+
     it("synthesizes a completed transition when heuristic-working silence outlasts the resync timer", async () => {
       // codex/gemini never emit OSC 9;4 — the ONLY signal they ever produce
       // is the sustained-output heuristic. This locks the silence-completion
@@ -474,6 +504,9 @@ describe("createTabManager attention tracker", () => {
         });
         await tm.init();
         await vi.advanceTimersByTimeAsync(0); // materialize poll → gate open (codex)
+
+        await tm.injectIntoPane(1, "first prompt", { autoSend: false, expectedAgent: "codex" });
+        await vi.advanceTimersByTimeAsync(400);
 
         // One isolated chunk starts the streak but isn't sustained yet…
         pty.emitOutput(1, "streaming tokens…");

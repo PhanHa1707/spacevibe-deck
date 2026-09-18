@@ -34,7 +34,7 @@ export interface AgentActivity {
    */
   noteOutputEvents(paneId: number, chunk: string): ActivityTransition[];
   /** The user wrote to this pane (keystroke/paste) — starts an echo window. */
-  noteInput(paneId: number): void;
+  noteInput(paneId: number, restartFallback?: boolean): void;
   /**
    * Foreground process of the pane as last polled. A change (agent exited to
    * the shell, a new agent started) resets the pane's record so a stale OSC
@@ -265,8 +265,13 @@ export function createAgentActivity(options: AgentActivityOptions = {}): AgentAc
         },
       ];
     },
-    noteInput(paneId) {
-      getOrCreate(paneId).lastInputAt = now();
+    noteInput(paneId, restartFallback = false) {
+      const record = getOrCreate(paneId);
+      record.lastInputAt = now();
+      if (restartFallback) {
+        record.streakStart = 0;
+        record.lastOutputAt = 0;
+      }
     },
     noteProcess(paneId, process) {
       const record = getOrCreate(paneId);

@@ -45,7 +45,7 @@ export interface PaneLifecycle {
    * ordered by construction rather than by a timeout. Resolves true only when
    * this exact write reaches the PTY.
    */
-  enqueueWrite(id: number, data: string): Promise<boolean>;
+  enqueueWrite(id: number, data: string, userInput?: boolean): Promise<boolean>;
   /** Await everything already queued for this pane; see the implementation. */
   drainWrites(id: number): Promise<void>;
   /** Park new PTY writes for this pane; the returned function releases them. */
@@ -61,6 +61,7 @@ export function createPaneLifecycle(deps: {
   getSettings: () => Settings;
   onWriteWhileExited: (id: number, data: string) => void;
   onFocus: (id: number) => void;
+  onUserInput?: (id: number) => void;
   onAttentionSignal?: (id: number, signal: PaneAttentionSignal) => void;
   /** Test seam — defaults to real createPane (xterm). */
   createPane?: CreatePaneFn;
@@ -88,7 +89,7 @@ export function createPaneLifecycle(deps: {
    */
   const writeHolds = new Map<number, Promise<void>>();
 
-  function enqueueWrite(id: number, data: string): Promise<boolean> {
+  function enqueueWrite(id: number, data: string, userInput = false): Promise<boolean> {
     if (exited.has(id)) {
       deps.onWriteWhileExited(id, data);
       return Promise.resolve(false);
@@ -108,6 +109,7 @@ export function createPaneLifecycle(deps: {
       }
       try {
         await deps.pty.writePty(id, data);
+        if (userInput) deps.onUserInput?.(id);
         return true;
       } catch {
         reportPersistError("Couldn't send input to the terminal — the session may have ended.");
@@ -154,8 +156,8 @@ export function createPaneLifecycle(deps: {
   }
 
   const paneEvents: PaneEvents = {
-    onData(id, data) {
-      return enqueueWrite(id, data);
+    onData(id, data, userInput) {
+      return enqueueWrite(id, data, userInput);
     },
     onResize(id, cols, rows) {
       if (exited.has(id)) {

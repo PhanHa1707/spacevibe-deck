@@ -25,7 +25,7 @@ export interface PaneAttentionSignal {
 
 export interface PaneEvents {
   /** Resolves true only when this exact input write reaches the PTY. */
-  onData(id: number, data: string): Promise<boolean>;
+  onData(id: number, data: string, userInput?: boolean): Promise<boolean>;
   onResize(id: number, cols: number, rows: number): void;
   onFocus(id: number): void;
   onAttentionSignal?(id: number, signal: PaneAttentionSignal): void;
@@ -238,8 +238,12 @@ export function createPane(
   let activeAgent: string | null = null;
   let capturePasteWrite: ((write: Promise<boolean>) => void) | null = null;
 
+  let userInput = false;
+  let keyInput: string | null = null;
   function forwardData(data: string): Promise<boolean> {
-    const write = events.onData(id, data);
+    const fromUser = userInput || keyInput === data;
+    if (keyInput === data) keyInput = null;
+    const write = events.onData(id, data, fromUser);
     capturePasteWrite?.(write);
     capturePasteWrite = null;
     return write;
@@ -292,12 +296,44 @@ export function createPane(
   // The addon's activate() already sets this; kept explicit as documentation.
   term.unicode.activeVersion = "15-graphemes";
 
+  // onData also carries terminal capability replies. Only actual browser
+  // input or our explicit paste path can enable Codex's output heuristic.
+  term.onKey(({ key }) => {
+    keyInput = key;
+  });
+  const markBrowserInput = (event: Event) => {
+    // IME finalization may send onData in a later task, after this DOM event.
+    // Match that text specifically; an intervening terminal reply cannot arm it.
+    if ("data" in event && typeof event.data === "string" && event.data !== "") {
+      keyInput = event.data;
+    }
+    userInput = true;
+    queueMicrotask(() => {
+      userInput = false;
+    });
+  };
+  for (const type of ["paste", "input", "compositionend"]) {
+    termEl.addEventListener(type, markBrowserInput, true);
+  }
+  function pasteUserText(text: string): void {
+    userInput = true;
+    try {
+      term.paste(text);
+    } finally {
+      userInput = false;
+    }
+  }
   term.onData((data) => void forwardData(data));
   term.onResize(({ cols, rows }) => events.onResize(id, cols, rows));
   // Shift+Enter carries no protocol encoding of its own — bind it to ESC CR so
   // agent CLIs wrap the line instead of submitting. See shift-enter.ts.
   const disposeShiftEnter = installShiftEnterNewline(termEl, (data) => {
-    void forwardData(data);
+    userInput = true;
+    try {
+      void forwardData(data);
+    } finally {
+      userInput = false;
+    }
   });
   element.addEventListener("focusin", () => events.onFocus(id));
   element.addEventListener("mousedown", () => events.onFocus(id));
@@ -485,6 +521,9 @@ export function createPane(
     }
     observer.disconnect();
     disposeShiftEnter();
+    for (const type of ["paste", "input", "compositionend"]) {
+      termEl.removeEventListener(type, markBrowserInput, true);
+    }
     linkProvider.dispose();
     osc9Handler.dispose();
     osc777Handler.dispose();
@@ -526,7 +565,11 @@ export function createPane(
     hasSelection: () => term.hasSelection(),
     clearSelection: () => term.clearSelection(),
     paste() {
-      pasteIntoTerminal(term);
+      pasteIntoTerminal({
+        getSelection: () => term.getSelection(),
+        hasSelection: () => term.hasSelection(),
+        paste: pasteUserText,
+      });
     },
     pasteText(text) {
       let capturedWrite: Promise<boolean> | null = null;
@@ -536,7 +579,7 @@ export function createPane(
       try {
         // xterm's public paste path synchronously emits one prepared/bracketed
         // onData frame. If it emits nothing, fail closed and never auto-submit.
-        term.paste(text);
+        pasteUserText(text);
       } finally {
         capturePasteWrite = null;
       }
