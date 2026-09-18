@@ -58,7 +58,7 @@ function mount(c: BoardCard, a = actions()) {
 }
 
 describe("AgentBoardCard", () => {
-  it("prints the repo beside the logo and the checkout beside the ordinal", () => {
+  it("prints the agent and checkout beside the logo and the project beside the ordinal", () => {
     const { host } = mount(card());
     const el = host.querySelector(".board-card")!;
     expect(el.getAttribute("data-state")).toBe("asked");
@@ -66,9 +66,11 @@ describe("AgentBoardCard", () => {
     expect(host.querySelector(".board-card__state")!.classList.contains("board-label")).toBe(true);
     expect(host.querySelector(".board-card__num")!.textContent).toBe("03");
     expect(host.querySelector(".board-card__glyph")).not.toBeNull();
-    expect(host.querySelector(".board-card__id")!.textContent).toBe("deck");
-    expect(host.querySelector(".board-card__where")!.textContent).toBe("deck");
-    expect(host.querySelector(".board-card__checkout")!.textContent).toBe("main");
+    // DL-34.2, amended 2026-09-18: agent · checkout on the identity line, the
+    // project in the corner pill.
+    expect(host.querySelector(".board-card__id")!.textContent).toBe("Claude · main");
+    expect(host.querySelector(".board-card__where")!.textContent).toBe("Claude · main");
+    expect(host.querySelector(".board-card__checkout")!.textContent).toBe("deck");
     // A real space, so assistive tech does not announce "TaskRefactor".
     expect(host.querySelector(".board-card__what")!.textContent).toBe("Task Refactor the rail");
     expect(host.querySelector(".board-card__meta")!.textContent).toBe("2m ago");

@@ -152,14 +152,19 @@ export function AgentBoardCard({ card, actions, tabIndex, onFocusRequest }: Agen
         />
         <span class="board-label board-card__state">{word}</span>
       </div>
-      <span class="board-card__checkout" title={card.checkout}>
-        {card.checkout}
+      {/* DL-34.2, amended 2026-09-18: the identity line names the AGENT and
+          its checkout; the corner pill carries the project. Until then the
+          line printed the project beside a 17px logo, so every card of one
+          repository read the same and only the logo told Claude from Codex —
+          and nothing told Claude from Claude 2 but the rank. */}
+      <span class="board-card__checkout" title={card.where}>
+        {card.project}
       </span>
       <span class="board-card__num">{formatRank(card.rank)}</span>
       <div class="board-card__id">
         <AgentGlyph agent={card.agent} className="board-card__glyph" />
         <span class="board-card__where" title={card.where}>
-          {card.project}
+          {card.name} · {card.checkout}
         </span>
       </div>
       <div class="board-card__what" data-kind={card.what.kind}>
