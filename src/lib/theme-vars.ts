@@ -17,7 +17,7 @@ import { deriveChromeColors } from "./derive-colors";
  * `:root` so a preset missing an optional ANSI color lands on the same value
  * the stylesheet would have shown before any JS ran.
  */
-const FALLBACK_BG = "#16161e";
+const FALLBACK_BG = "#0a0a0a";
 const FALLBACK_FG = "#cbcbcb";
 const FALLBACK_ACCENT = "#7aa2f7";
 const FALLBACK_RED = "#f7768e";

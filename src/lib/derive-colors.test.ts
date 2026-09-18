@@ -117,10 +117,9 @@ describe("deriveChromeColors", () => {
     });
 
     /**
-     * `#161b22` is not reachable by mixing `#17181c` toward white, so the one
-     * background the owner hand-picked a sidebar for carries a literal
-     * (DL-2.1's ledger). Pinned on the background, not the preset id: override
-     * that background and the pin correctly stops applying.
+     * The owner's neutral-black sidebar stays above the deepest pane.
+     * Pinned on the background, not the preset id: override that background
+     * and the pin correctly stops applying (DL-2.2).
      */
     it("pins the sidebar Deck's own dark background was given", () => {
       // Read off the preset rather than written twice: the pin is keyed on
@@ -129,10 +128,10 @@ describe("deriveChromeColors", () => {
       const deckDark = THEME_PRESETS[0];
       expect(deckDark.id).toBe("deck-dark");
       const bg = deckDark.theme.background;
-      expect(deriveChromeColors(bg, deckDark.theme.foreground).sidebarBg).toBe("#161b22");
+      expect(deriveChromeColors(bg, deckDark.theme.foreground).sidebarBg).toBe("#141414");
       // And it is the BACKGROUND that claims it, not the preset: one channel
       // away is a different theme, which derives its own sidebar.
-      expect(deriveChromeColors("#17181d", "#e7e7e7").sidebarBg).not.toBe("#161b22");
+      expect(deriveChromeColors("#0a0a0b", "#e7e7e7").sidebarBg).not.toBe("#141414");
     });
 
     it("preserves the distinction for light and pure-black overrides", () => {

@@ -193,11 +193,10 @@ function createWindow(label: string): BrowserWindow {
     width: 1100,
     height: 720,
     titleBarStyle: "hiddenInset",
-    // The pre-render ground follows `--bg`'s default (`src/styles.css` :root,
+    // The pre-render ground follows `--bg`'s default (`styles/01-tokens.css` :root,
     // `FALLBACK_BG` in theme-vars.ts), or window-open and resize flash a
-    // colour the app never shows again. Tauri's window config carries the
-    // same value for the same reason.
-    backgroundColor: "#16161e",
+    // colour the app never shows again.
+    backgroundColor: "#0a0a0a",
     webPreferences: {
       preload: PRELOAD,
       contextIsolation: true,
