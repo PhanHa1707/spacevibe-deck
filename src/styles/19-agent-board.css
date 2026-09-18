@@ -11,11 +11,10 @@
    are kept, unmatched, as what a revert re-mounts. */
 
 /* The Board's rectangle on the stage is `.stage__surface` itself (spec §4.1),
-   and that class has carried `padding: 0` since 2026-08-17 — so unlike
-   `.stage__surface--browser`, which zeroed a gutter that no longer exists, the
-   Board's modifier needs no declaration of its own. The class stays on the
-   element as the surface's name in the DOM; a rule that only restated the base
-   would be dead the day someone tried to change it. */
+   and it takes that class's `--stage-gutter` and 6px corner unchanged
+   (DL-18.12, 2026-09-18) — the Board is a card on the gutter like a pane or a
+   document. The modifier needs no declaration of its own; the class stays on
+   the element as the surface's name in the DOM. */
 
 .agent-board {
   /* DL-34.5 / DL-4.1: the one place chrome is monospace. */
