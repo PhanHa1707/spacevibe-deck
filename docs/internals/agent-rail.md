@@ -128,12 +128,30 @@ no-op, and the rail falls back to agent names.
 - **Only Claude Code, Codex and OpenCode produce a tail.** Gemini has no candidate scan,
   Antigravity's store is an undocumented protobuf, and custom agents are unknown. Those rows
   keep their agent name.
-- **A pane is asked about only once it has run something** (`hasRun`, or it was resumed), so a
-  fresh pane cannot wear a previous session's sentence. Requests are debounced 300ms on
-  `tabViews`, never on a timer.
+- **Codex panes are never ranked.** The [tail store](../../src/terminal/session-tail-store.ts)
+  requires a session-id fact and sends `preferredId` with `exact: true`; without a fact it
+  sends no request, even for a resumed pane. A missing rollout leaves the row blank.
+  A new fact discards any previous guessed pairing and its text, including late replies.
+- **Open writer locks identify Codex before its first prompt.** On Electron macOS/Linux,
+  [one background `lsof` batch](../../electron/platform/codex-thread-locks.ts) reads each
+  Codex foreground pid's open `~/.codex/thread-writer-locks/<thread-id>.lock` files.
+  One unique lock supplies the id. A process can also hold subagent locks: multiple locks
+  require exactly one matching rollout with an explicit interactive string `source`;
+  object-valued subagent sources and `exec` are excluded. Missing tools, unreadable metadata
+  or ambiguity yield no identity. This is an undocumented Codex internal; Windows supplies
+  no lock identity and Tauri has no implementation. The
+  [pty-info reader](../../electron/pty/info.ts) binds background results to the observed
+  process generation; the [client's availability gate](../../src/terminal/pty-client.ts)
+  and existing tracker carry the fact to the pane without inferring activity.
+- **Other agents can still use transcript ranking.** The
+  [store](../../src/terminal/session-tail-store.ts) asks after `hasRun`, a resume mark or an
+  exact fact. Fresh generations carry `notBefore`; the
+  [resolver](../../electron/resume/resolve.ts) drops older candidates. This floor only
+  narrows a guess. Exact pins bypass ranking, and resume marks omit the floor. Requests
+  are debounced 300ms on `tabViews`, never on a timer.
 - **The pane→session pairing is remembered and pinned.** A request carries `preferredId`,
   and `resolveSessionTails` runs two passes: every pin is honoured through
-  `findCandidateById` (no 30-day cutoff, no ranking) before any unpinned pane is ranked by
+  `findCandidateById` (no 30-day cutoff, no ranking) before any eligible, non-exact pane is ranked by
   mtime proximity through the same `selectCandidate` that session restore uses. The two
   passes exist because the earlier one-pass version let an unpinned pane earlier in the
   request take a later pane's pinned session, which is how three rows once printed the same

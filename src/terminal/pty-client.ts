@@ -90,36 +90,39 @@ interface PromptReadyPayload {
   id: number;
 }
 
+const CODEX_THREAD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Production adapter — Tauri IPC. */
 export function createTauriPtyClient(): PtyClient {
-  const electronSessionCwds: Pick<PtyClient, "sessionCwds"> =
+  const available =
     typeof globalThis !== "undefined" &&
-    (globalThis as { __deckHost?: unknown }).__deckHost !== undefined
-      ? {
-          async sessionCwds(ids) {
-            if (ids.length === 0) {
-              return [];
-            }
-            const value = await invoke<unknown>("pty_cwds", { ids: [...ids] });
-            if (
-              !Array.isArray(value) ||
-              !value.every(
-                (row) =>
-                  typeof row === "object" &&
-                  row !== null &&
-                  "id" in row &&
-                  Number.isSafeInteger(row.id) &&
-                  row.id > 0 &&
-                  "cwd" in row &&
-                  (typeof row.cwd === "string" || row.cwd === null),
-              )
-            ) {
-              throw new TypeError("Invalid pty_cwds response");
-            }
-            return value as PtySessionCwd[];
-          },
-        }
-      : {};
+    (globalThis as { __deckHost?: unknown }).__deckHost !== undefined;
+  const electronSessionCwds: Pick<PtyClient, "sessionCwds"> = available
+    ? {
+        async sessionCwds(ids) {
+          if (ids.length === 0) {
+            return [];
+          }
+          const value = await invoke<unknown>("pty_cwds", { ids: [...ids] });
+          if (
+            !Array.isArray(value) ||
+            !value.every(
+              (row) =>
+                typeof row === "object" &&
+                row !== null &&
+                "id" in row &&
+                Number.isSafeInteger(row.id) &&
+                row.id > 0 &&
+                "cwd" in row &&
+                (typeof row.cwd === "string" || row.cwd === null),
+            )
+          ) {
+            throw new TypeError("Invalid pty_cwds response");
+          }
+          return value as PtySessionCwd[];
+        },
+      }
+    : {};
   return {
     spawnShell({ cols, rows, cwd }) {
       return invoke<number>("spawn_shell", { cols, rows, cwd });
@@ -144,11 +147,21 @@ export function createTauriPtyClient(): PtyClient {
       if (ids.length === 0) {
         return [];
       }
-      return invoke<PaneProcessInfo[]>("pty_info", {
+      const infos = await invoke<PaneProcessInfo[]>("pty_info", {
         ids: [...ids],
         agents: [...agentMatchers],
         waitForCwd,
       });
+      return infos.map((info) => ({
+        ...info,
+        codexSessionId:
+          available &&
+          info.agent === "codex" &&
+          typeof info.codexSessionId === "string" &&
+          CODEX_THREAD_ID.test(info.codexSessionId)
+            ? info.codexSessionId
+            : null,
+      }));
     },
     ...electronSessionCwds,
     gitBranch(cwd) {

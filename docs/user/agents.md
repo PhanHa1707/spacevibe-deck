@@ -9,13 +9,19 @@ and reads the tool's own session logs where it knows their format.
 Deck recognises five agents out of the box. Each ships with a launch command, and the command
 is shown on screen in Settings → Agents rather than hidden behind a label.
 
-| Agent       | Launch command                                     |
-| ----------- | -------------------------------------------------- |
-| Claude Code | `claude --dangerously-skip-permissions`            |
-| Codex       | `codex --dangerously-bypass-approvals-and-sandbox` |
-| OpenCode    | `opencode`                                         |
-| Antigravity | `agy --dangerously-skip-permissions`               |
-| Gemini CLI  | `gemini --yolo`                                    |
+| Agent       | Launch command                                                              |
+| ----------- | --------------------------------------------------------------------------- |
+| Claude Code | `claude --dangerously-skip-permissions`                                     |
+| Codex       | `codex --dangerously-bypass-approvals-and-sandbox -c tui.animations=false` |
+| OpenCode    | `opencode`                                                                  |
+| Antigravity | `agy --dangerously-skip-permissions`                                        |
+| Gemini CLI  | `gemini --yolo`                                                             |
+
+Codex's `-c tui.animations=false` turns off its idle animations. Codex keeps repainting its
+prompt while it waits, and Deck would read that as an agent still working, so the row would
+show the busy bars before you have typed anything and after the reply has landed. If you
+write your own Codex command, keep that flag, or set `animations = false` under `[tui]` in
+`~/.codex/config.toml` to turn the animations off in every terminal.
 
 Several of these skip the tool's own confirmation prompts. That is the point of Deck, which
 exists to run agents that keep working, and it is also why every command is spelled out and

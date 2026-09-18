@@ -428,6 +428,34 @@ describe("createTabManager attention tracker", () => {
       }
     });
 
+    it("carries the Codex pty-info identity into PaneView without marking a run", async () => {
+      vi.useFakeTimers();
+      const thread = "01900000-0000-7000-8000-000000000001";
+      const infos = new Map<number, PaneProcessInfo>([
+        [
+          1,
+          {
+            ...processInfo(1, "/repo", "codex", "agent", "codex"),
+            processId: 42,
+            codexSessionId: thread,
+          },
+        ],
+      ]);
+      const { tm } = setupControllable(infos);
+      try {
+        await tm.openFromPreset({ type: "leaf" }, ["/repo"], { workspacePath: "/repo" });
+        await tm.init();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(tabViews.value[0].panes?.[0]).toMatchObject({ sessionId: thread, hasRun: false });
+        infos.set(1, { ...infos.get(1)!, processId: 43, codexSessionId: null });
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(tabViews.value[0].panes?.[0].sessionId).toBeNull();
+      } finally {
+        tm.dispose();
+        vi.useRealTimers();
+      }
+    });
+
     it("synthesizes a completed transition when heuristic-working silence outlasts the resync timer", async () => {
       // codex/gemini never emit OSC 9;4 — the ONLY signal they ever produce
       // is the sustained-output heuristic. This locks the silence-completion

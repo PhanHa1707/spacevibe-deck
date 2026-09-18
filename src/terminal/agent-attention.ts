@@ -215,6 +215,12 @@ export interface AgentAttentionTracker {
    * agent, whatever pid the registry matched.
    */
   noteRegistry(id: number, fact: RegistryFact | null): PaneAttentionSnapshot | null;
+  /** Identity only: open Codex writer locks say nothing about activity. */
+  noteProcessSession(
+    id: number,
+    pid: number | null,
+    sessionId: string | null,
+  ): PaneAttentionSnapshot | null;
   /**
    * A CLI's own event for this pane, over a channel it documents — a Claude
    * hook post or opencode's server stream (stage 2). Every kind is explicit.
@@ -254,6 +260,8 @@ export interface AgentAttentionTracker {
 
 /** Internal per-pane record. Treated immutably: reducers return fresh copies. */
 interface PaneState {
+  readonly processSessionPid: number | null;
+  readonly processSessionId: string | null;
   readonly codexLifecycle: CodexLifecycle | null;
   readonly phase: AgentPhase;
   readonly attention: AttentionKind;
@@ -307,6 +315,8 @@ const TAB_KIND_BY_RANK: readonly TabAttentionKind[] = [
 
 function freshState(): PaneState {
   return {
+    processSessionPid: null,
+    processSessionId: null,
     codexLifecycle: null,
     phase: "unknown",
     attention: "none",
@@ -766,6 +776,8 @@ export function createAgentAttentionTracker(
             exitCode: null,
             agentLabel: process,
             sessionId: prev.pendingSessionId,
+            processSessionPid: null,
+            processSessionId: null,
             pendingSessionId: null,
             codexLifecycle: null,
             contractAt: null,
@@ -791,6 +803,8 @@ export function createAgentAttentionTracker(
             // A new occupant has no session yet, whatever the last one ran —
             // unless Deck minted one for the command it just typed (stage 2).
             sessionId: prev.pendingSessionId,
+            processSessionPid: null,
+            processSessionId: null,
             pendingSessionId: null,
             codexLifecycle: null,
             contractAt: null,
@@ -843,6 +857,19 @@ export function createAgentAttentionTracker(
         gateOpenedAt: 0,
       };
       return commit(id, prev, candidate);
+    },
+
+    noteProcessSession(id, pid, sessionId) {
+      const prev = panes.get(id);
+      if (prev === undefined || !prev.isAgent || prev.agentLabel !== "codex") return null;
+      const replaced = prev.processSessionPid !== null && prev.processSessionPid !== pid;
+      const withdrawn = prev.processSessionId !== null && prev.sessionId === prev.processSessionId;
+      return commit(id, prev, {
+        ...prev,
+        processSessionPid: pid,
+        processSessionId: sessionId,
+        sessionId: sessionId ?? (replaced || withdrawn ? null : prev.sessionId),
+      });
     },
 
     noteRegistry(id, fact) {

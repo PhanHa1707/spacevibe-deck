@@ -647,6 +647,14 @@ describe("resolveSessionTails", () => {
     ).toEqual([{ id: "oc1", tail: "Working tree clean — nothing staged.", model: null }]);
   });
 
+  it("an exact Codex id without a rollout stays blank beside a same-cwd stranger", () => {
+    const request = { agent: "codex", cwd: "/tmp/codex", lastSeenAt: T1 };
+    expect(resolveSessionTails(home, [request])[0]?.id).toBe("cx1");
+    expect(
+      resolveSessionTails(home, [{ ...request, preferredId: "not-written", exact: true }]),
+    ).toEqual([null]);
+  });
+
   it("(w) an exact pin is honoured when on disk and answered null when not — never ranked (stage 1)", () => {
     // The registry says pane A runs `s2` and pane B runs `fresh-not-on-disk`
     // (a session whose file is not written yet). Before `exact`, B would have

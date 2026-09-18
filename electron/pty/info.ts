@@ -18,6 +18,7 @@ import {
 } from "../platform/classify";
 import * as macos from "../platform/macos";
 import * as windows from "../platform/windows";
+import { processCodexSessions } from "../platform/codex-thread-locks";
 import type { PtySessionSnapshot } from "./session-store";
 
 export interface PtyInfoPlatform {
@@ -37,6 +38,7 @@ function platform(): PtyInfoPlatform {
 export interface PtyInfo {
   readonly id: number;
   readonly processId: number | null;
+  readonly codexSessionId?: string | null;
   readonly cwd: string | null;
   readonly process: string | null;
   readonly kind: Classification["kind"];
@@ -105,7 +107,73 @@ export interface PtyInfoReader {
  * Stateful reader so cwd discovery can lag behind process classification
  * without losing the last verified directory for the same foreground pid.
  */
-export function createPtyInfoReader(getPlatform: () => PtyInfoPlatform = platform): PtyInfoReader {
+export function createPtyInfoReader(
+  getPlatform: () => PtyInfoPlatform = platform,
+  readCodexSessions: (
+    pids: readonly number[],
+  ) => Promise<Map<number, string>> = processCodexSessions,
+): PtyInfoReader {
+  type Identity = {
+    readonly pid: number;
+    readonly shellPid: number;
+    readonly sessionId: string | null;
+  };
+  const identities = new Map<number, Identity>();
+  let pendingIdentities = new Map<number, Identity>();
+  let identityRefresh: Promise<void> | null = null;
+
+  function refreshIdentities(): void {
+    if (identityRefresh !== null || pendingIdentities.size === 0) return;
+    const targets = pendingIdentities;
+    pendingIdentities = new Map();
+    const current = Promise.resolve()
+      .then(() =>
+        readCodexSessions([...new Set([...targets.values()].map((target) => target.pid))]),
+      )
+      .catch((error) => {
+        console.warn("Deck: Codex identity refresh failed", error);
+        return new Map<number, string>();
+      })
+      .then((sessions) => {
+        for (const [paneId, target] of targets) {
+          // Object identity includes the observed foreground generation. A late
+          // reading cannot attach to a replacement process (even with pid reuse).
+          if (identities.get(paneId) === target) {
+            identities.set(paneId, { ...target, sessionId: sessions.get(target.pid) ?? null });
+          }
+        }
+      })
+      .finally(() => {
+        if (identityRefresh === current) identityRefresh = null;
+        refreshIdentities();
+      });
+    identityRefresh = current;
+  }
+
+  function withCodexIdentity(
+    infos: PtyInfo[],
+    snapshots: readonly PtySessionSnapshot[],
+  ): PtyInfo[] {
+    const result = infos.map((info) => {
+      const shellPid = snapshots.find((snapshot) => snapshot.id === info.id)?.pid;
+      if (info.agent !== "codex" || info.processId === null || shellPid === undefined) {
+        identities.delete(info.id);
+        pendingIdentities.delete(info.id);
+        return info;
+      }
+      const old = identities.get(info.id);
+      const identity =
+        old?.pid === info.processId && old.shellPid === shellPid
+          ? old
+          : { pid: info.processId, shellPid, sessionId: null };
+      identities.set(info.id, identity);
+      pendingIdentities.set(info.id, identity);
+      return { ...info, codexSessionId: identity.sessionId };
+    });
+    refreshIdentities();
+    return result;
+  }
+
   const cwdByPane = new Map<number, CachedCwd>();
   let pendingCwdTargets = new Map<number, number>();
   let cwdRefresh: Promise<void> | null = null;
@@ -198,7 +266,10 @@ export function createPtyInfoReader(getPlatform: () => PtyInfoPlatform = platfor
         }
         scheduleCwdRefresh(processPlatform);
       }
-      return buildPtyInfo(snapshots, rows, cachedCwds, processPlatform, agentMatchers);
+      return withCodexIdentity(
+        buildPtyInfo(snapshots, rows, cachedCwds, processPlatform, agentMatchers),
+        snapshots,
+      );
     },
   };
 }

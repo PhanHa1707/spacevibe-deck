@@ -2077,6 +2077,9 @@ export function createTabManager(
         if (snap !== null) {
           maybeNotify(info.id, snap);
         }
+        if (agent === "codex") {
+          tracker.noteProcessSession(info.id, info.processId ?? null, info.codexSessionId ?? null);
+        }
       }
       // Stage 3's freshness: a contract-layer state nobody has refreshed in
       // two minutes turns inferred, on the same tick the process table is

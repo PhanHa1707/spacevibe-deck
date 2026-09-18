@@ -909,3 +909,31 @@ describe("AgentAttentionTracker — actionable", () => {
     expect(tracker.actionable()).toEqual([]);
   });
 });
+
+describe("Codex process session identity", () => {
+  it("records identity without inventing lifecycle or attention", () => {
+    const { tracker } = setup();
+    tracker.noteProcess(1, "codex", true);
+    const before = tracker.snapshot(1)!;
+    tracker.noteProcessSession(1, 42, "own");
+    expect(tracker.snapshot(1)).toMatchObject({
+      sessionId: "own",
+      hasRun: false,
+      phase: before.phase,
+      attention: before.attention,
+      phaseConfidence: before.phaseConfidence,
+    });
+    tracker.noteProcessSession(1, 42, null);
+    expect(tracker.snapshot(1)?.sessionId).toBeNull();
+  });
+  it("forgets the prior process identity and refuses non-Codex panes", () => {
+    const { tracker } = setup();
+    tracker.noteProcess(1, "codex", true);
+    tracker.noteProcessSession(1, 42, "old");
+    tracker.noteProcessSession(1, 43, null);
+    expect(tracker.snapshot(1)?.sessionId).toBeNull();
+    tracker.noteProcess(1, "claude", true);
+    tracker.noteProcessSession(1, 43, "wrong");
+    expect(tracker.snapshot(1)?.sessionId).toBeNull();
+  });
+});

@@ -5,23 +5,19 @@
  * exists is the CLI's own session log on disk. Reading it is a main-process
  * job (`session_tail`), so this module's whole responsibility is deciding
  * WHEN to ask and holding the answers: a debounced effect on `tabViews` that
- * fires only when an agent pane's `changedAt` actually moved. The main
+ * fires when an agent generation, identity or `changedAt` moves. The main
  * process answers a model beside every tail, so `paneModels` is written by
  * the SAME merge under the SAME pairing rules as `paneTails` — the two can
  * never describe different sessions.
  *
- * Two rules carry the correctness here:
+ * Codex requires an exact session fact, even after a resume or startup
+ * output. Without one it never asks. Other agents may ask after `hasRun`, a
+ * resume mark or an exact fact. A missing exact rollout stays blank until
+ * the conversation is written; the fact overrides any earlier guessed pin.
  *
- * - **A pane gets a request once it has `hasRun` OR was resumed into an
- *   existing conversation.** A freshly opened pane has never run anything, but
- *   its cwd may well hold a recent session from yesterday — asking for it would
- *   dress a silent pane in someone else's sentence. A RESTORED pane is the
- *   opposite case: yesterday's session is exactly the one it just typed
- *   `--resume` into, so it must not stay blank until the user prompts it again
- *   (2026-08-17). `noteResumedPane` is how the restore paths say so.
- * - **A `null` answer keeps the previous tail.** Not finding a session this
- *   time (a scan that raced a write, a cwd that drifted) is not evidence that
- *   what the pane said before is wrong.
+ * A null answer preserves text only while the identity remains the same.
+ * Identity withdrawal/replacement clears it before asking, and an in-flight
+ * answer for an obsolete snapshot cannot bring it back.
  *
  * Window-scoped module store (R5), debounced like
  * [`session-journal.ts`](./session-journal.ts) and driven the same way — by
@@ -43,8 +39,8 @@ export const paneModels: Signal<ReadonlyMap<number, string>> = signal(new Map())
  * Which session each pane is PAIRED with — the second half of what the store
  * holds, and the reason a sentence stays where it belongs.
  *
- * The main process cannot know which conversation a pane is running; it ranks
- * candidates by how close their mtime falls to the pane's clock. Re-asked every
+ * Without a session fact, eligible non-Codex panes may rank candidates by
+ * how close their mtime falls to the pane's clock. Re-asked every
  * few seconds, that ranking answered differently every time: a pane was
  * re-paired, its old session was released to the next pane, and because a null
  * tail keeps the sentence already on screen, one sentence ended up printed on
@@ -229,7 +225,7 @@ function fingerprintOf(tabs: readonly TabView[]): string {
     .flatMap((tab) =>
       panesOf(tab).map(
         (pane) =>
-          `${pane.paneId}:${liveAgentOf(pane) ?? ""}:${pane.hasRun ? 1 : 0}:${pane.changedAt}`,
+          `${pane.paneId}:${liveAgentOf(pane) ?? ""}:${pane.hasRun ? 1 : 0}:${pane.changedAt}:${pane.sessionId ?? ""}`,
       ),
     )
     .join("|");
@@ -332,7 +328,7 @@ function entriesOf(tabs: readonly TabView[]): readonly TailEntry[] {
       // an empty tail on its own.
       const fact =
         typeof pane.sessionId === "string" && pane.sessionId !== "" ? pane.sessionId : null;
-      if (!pane.hasRun && !resumed && fact === null) {
+      if ((agent === "codex" && fact === null) || (!pane.hasRun && !resumed && fact === null)) {
         continue;
       }
       const preferredId = fact ?? paneSessions.get(pane.paneId);
@@ -512,6 +508,15 @@ function prune(
         // generation", through `forget`'s own delete branch.
         forget(tails, models, pane.paneId, liveAgentOf(pane) === null);
       }
+      // Identity beats an earlier guess even when the exact rollout does not
+      // exist yet. An unidentified Codex pane must not retain guessed text.
+      const fact = pane.sessionId || null;
+      if (
+        (liveAgentOf(pane) !== null && fact !== null && fact !== paneSessions.get(pane.paneId)) ||
+        (liveAgentOf(pane) === "codex" && fact === null)
+      ) {
+        forget(tails, models, pane.paneId, false);
+      }
       // The floor moves only when the occupant does: first sight of the pane,
       // or a generation change. A pane merely doing something (`ran` going
       // true) keeps the floor its agent started under. The tracker stamps
@@ -535,10 +540,6 @@ async function run(): Promise<void> {
   const tabs = tabViews.peek();
   const fingerprint = fingerprintOf(tabs);
   if (fingerprint === sentFingerprint) {
-    return;
-  }
-  if (inFlight) {
-    queued = true;
     return;
   }
   // Forgetting comes first, and unconditionally — a tail that outlives its
@@ -569,6 +570,10 @@ async function run(): Promise<void> {
     // Pruning drops pairings too, so the mirror moves with it.
     publishPairings();
   }
+  if (inFlight) {
+    queued = true;
+    return;
+  }
   const entries = entriesOf(tabs);
   sentFingerprint = fingerprint;
   if (entries.length === 0) {
@@ -581,7 +586,9 @@ async function run(): Promise<void> {
     // A reset while this was in flight means those entries describe panes that
     // no longer exist as far as this store is concerned; merging them would
     // rebuild the state the reset just cleared.
-    if (epoch === epochAtSend) {
+    if (epoch === epochAtSend && fingerprintOf(tabViews.peek()) !== fingerprint) {
+      queued = true;
+    } else if (epoch === epochAtSend) {
       const next = merged({ tails: paneTails.value, models: paneModels.value }, entries, answers);
       paneTails.value = next.tails;
       paneModels.value = next.models;

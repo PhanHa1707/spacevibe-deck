@@ -32,6 +32,11 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 
 ### Agents
 
+- **Fresh Codex panes keep their own conversation.** The rail
+  [requires an exact session identity](src/terminal/session-tail-store.ts), so a new pane
+  stays blank until its own conversation is available, even when another Codex is active
+  in the same folder.
+
 - **Signals are off again after upgrading from 1.1.** Deck 1.1 saved every
   agent's reporting switch as on, and 1.2.0 took that as your choice, so it kept
   adding its hooks to your Claude and Codex settings. This update
@@ -41,6 +46,12 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 - **Codex no longer asks you to review your own hooks again.** Deck's Codex
   hooks [stay where they are](electron/agent-hooks/codex-hooks.ts) when Deck
   starts, instead of moving behind hooks you added later.
+
+- **Codex rows stop showing the busy bars while Codex is idle.** Codex 0.154
+  animates its prompt background, which Deck read as work in progress. Deck now
+  [launches Codex with its idle animations off](src/lib/agents/codex.ts); if you
+  wrote your own Codex command, add `-c tui.animations=false` or use the new
+  "No idle animations" switch under Settings → Agents.
 
 ### Updates
 
