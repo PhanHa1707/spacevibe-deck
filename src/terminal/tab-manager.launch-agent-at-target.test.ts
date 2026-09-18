@@ -277,4 +277,28 @@ describe("explicit agent launch target", () => {
     await vi.advanceTimersByTimeAsync(3000);
     expect(pty.writes).toEqual([]);
   });
+
+  // The page stays up while the rail is live, so the tab it captured can be
+  // closed under it. The split must fail rather than dock beside a dead owner.
+  it("fails a split whose captured tab closed while the page was open", async () => {
+    const pty = createMemoryPtyClient({
+      nextId: 1,
+      infos: new Map([[1, processInfo(1, "/repo", "zsh", "idle-shell", null)]]),
+    });
+    const { tm } = wire(pty);
+    await tm.openQuickAgent(null, "/repo");
+    const target = tm.captureAgentLaunchTarget("/repo")!;
+    expect(target.kind).toBe("split");
+
+    tm.runAction("close-tab");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(tabViews.value).toHaveLength(0);
+    // The captured pane went with its tab; the launch must add nothing back.
+    const sessionsBefore = pty.sessions.size;
+
+    expect((await tm.launchAgentAtTarget(target, "claude", () => true)).kind).toBe("failed");
+    expect(pty.sessions.size).toBe(sessionsBefore);
+    expect(pty.writes).toEqual([]);
+    tm.dispose();
+  });
 });

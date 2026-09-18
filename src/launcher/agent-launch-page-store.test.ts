@@ -63,4 +63,93 @@ describe("agent launch page state", () => {
     expect(page.request.value).not.toBeNull();
     expect(page.pending.value).toBe(false);
   });
+
+  it("leaves the page usable when a launch is cancelled", async () => {
+    const page = createAgentLaunchPageStore();
+    const reveal = vi.fn();
+    const releaseStage = vi.fn();
+    page.open({
+      target,
+      launch: async () => ({ kind: "cancelled" }),
+      restoreFocus: vi.fn(),
+      reveal,
+      releaseStage,
+    });
+    await page.run("claude");
+    // Cancelled is not a failure: no message to show, and nothing was created,
+    // so the page keeps the stage and stays ready for another choice.
+    expect(page.error.value).toBeNull();
+    expect(page.request.value).not.toBeNull();
+    expect(page.pending.value).toBe(false);
+    expect(reveal).not.toHaveBeenCalled();
+    expect(releaseStage).not.toHaveBeenCalled();
+  });
+
+  it("reports a thrown launch without stranding the page", async () => {
+    const page = createAgentLaunchPageStore();
+    page.open({
+      target,
+      launch: async () => {
+        throw new Error("host went away");
+      },
+      restoreFocus: vi.fn(),
+      reveal: vi.fn(),
+    });
+    await page.run("claude");
+    expect(page.error.value).toBe("Could not open the agent. Try again.");
+    expect(page.request.value).not.toBeNull();
+    expect(page.pending.value).toBe(false);
+  });
+
+  it("releases the stage exactly once, on close and on a spawned run", async () => {
+    const onClose = vi.fn();
+    const closing = createAgentLaunchPageStore();
+    closing.open({
+      target,
+      launch: vi.fn(),
+      restoreFocus: vi.fn(),
+      reveal: vi.fn(),
+      releaseStage: onClose,
+    });
+    closing.close();
+    expect(onClose).toHaveBeenCalledOnce();
+
+    const onSpawn = vi.fn();
+    const spawning = createAgentLaunchPageStore();
+    spawning.open({
+      target,
+      launch: async () => ({
+        kind: "spawned",
+        receipt: { tabKey: 1, paneId: 1, canFocus: () => true },
+      }),
+      restoreFocus: vi.fn(),
+      reveal: vi.fn(),
+      releaseStage: onSpawn,
+    });
+    await spawning.run("claude");
+    expect(onSpawn).toHaveBeenCalledOnce();
+  });
+
+  it("frees the Run guard when the page closes mid-launch", async () => {
+    const page = createAgentLaunchPageStore();
+    let resolve!: (result: AgentLaunchResult) => void;
+    page.open({
+      target,
+      launch: () =>
+        new Promise<AgentLaunchResult>((done) => {
+          resolve = done;
+        }),
+      restoreFocus: vi.fn(),
+      reveal: vi.fn(),
+    });
+    void page.run("claude");
+    expect(page.pending.value).toBe(true);
+    page.close();
+    // Reopening must not inherit the abandoned launch's disabled Run.
+    expect(page.pending.value).toBe(false);
+    page.open({ target, launch: vi.fn(), restoreFocus: vi.fn(), reveal: vi.fn() });
+    resolve({ kind: "cancelled" });
+    await Promise.resolve();
+    expect(page.pending.value).toBe(false);
+  });
 });
