@@ -3260,6 +3260,25 @@ Numbered 32 because §22 stays reserved and §31 was the previous highest rule.
   shown inert.** This applies DL-19.7 to host-only workspace actions and to the
   runtime selector: capability absence is not presented as a disabled feature.
 
+- **DL-32.6** **The compact agent launcher is a transient stage page.** It
+  uses the owner-approved Original composition, compact cards and separate
+  `Run` buttons, with existing agent logos and no fabricated profile/recent
+  badges. The sidebar and strip keep their existing places; the page owns no
+  strip item. Covered content remains mounted but inert, and the native browser
+  is hidden. Back/Escape return without creating a process; Settings returns
+  focus to the page. This is separate from the legacy Quick Launch popover
+  in DL-32.4 ([page](../src/launcher/agent-launch-page.tsx),
+  [treatment](../src/launcher/agent-launch-page.css), [integration](../src/ui/app.tsx)).
+
+- **DL-32.7** **Agent panes carry one compact identity header.** On Electron,
+  the [pane header](../src/terminal/pane-agent-header.tsx) uses the sidebar's
+  latest message, an agent logo and a trailing Claude-only effort control. The message
+  stays on one line with ellipsis; its full text is available on hover.
+  This agent header remains visible when the legacy shell pane bar is hidden.
+  Hover stays neutral and keyboard focus stays explicit in the
+  [treatment](../src/terminal/pane-agent-header.css). The control opens Claude's
+  native model/effort picker; Deck does not display an unverified effort value.
+
 ## 33. Sidebar usage and retained activity rows
 
 The sidebar uses [AgentUsageSummary](../src/ui/usage/agent-usage-summary.tsx),
