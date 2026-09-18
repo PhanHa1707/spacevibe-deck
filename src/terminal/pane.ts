@@ -16,6 +16,7 @@ import { classifyOscNotification } from "../lib/osc-notification";
 import { copyTerminalSelection, pasteIntoTerminal } from "./terminal-clipboard";
 import { getDesktopEnvironment } from "../lib/platform";
 import { createCodexWheelHandler } from "./codex-wheel";
+import { mountPaneAgentHeader } from "./pane-agent-header";
 
 /** Structured attention signal a pane can emit — never a native notification. */
 export interface PaneAttentionSignal {
@@ -164,6 +165,10 @@ export function createPane(
   badge.className = "pane__badge pane__badge--shell";
   badge.textContent = "shell";
   bar.append(dot, cwdEl, badge);
+  const disposeAgentHeader = mountPaneAgentHeader(id, element, bar, {
+    send: (data) => events.onData(id, data, true),
+    focus: () => term.focus(),
+  });
 
   // Hover anchor: shown only while the pane bar is hidden (CSS-gated).
   // It is the pane-drag handle and nothing else — the grip glyph is the whole
@@ -516,6 +521,7 @@ export function createPane(
   }
 
   function dispose(): void {
+    disposeAgentHeader();
     if (resizeTimer !== null) {
       clearTimeout(resizeTimer);
     }
