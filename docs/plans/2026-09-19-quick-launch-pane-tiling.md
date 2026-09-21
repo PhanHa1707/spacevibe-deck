@@ -1,6 +1,6 @@
 # Quick Launch tiles into the roomiest pane
 
-Started 2026-09-19. Status: implemented, uncommitted, not eye-checked.
+Started 2026-09-19. Status: shipped to `origin/main` as `74c29b8` on 2026-09-21; not eye-checked in the real app.
 
 ## Problem
 
@@ -72,19 +72,25 @@ Not run: eye check in the real app, and manual native acceptance on a packaged b
 
 ## Handoff
 
-Branch `main`, checkout `spacevibe-deck`, nothing committed.
+Committed on local `main` as `b76e3bf` and pushed to `origin/main` as `74c29b8`
+(`ec47c8b..74c29b8`) on 2026-09-21, cherry-picked through a detached worktree because the
+shared checkout's local `main` carries peers' unpushed twins.
 
 Changed: `src/lib/pane-tiling.ts` (new), `src/lib/pane-tiling.test.ts` (new),
 `src/terminal/tab-manager.ts`, `src/terminal/tab-manager.launch-agent-at-target.test.ts`,
 `src/launcher/agent-launch-page.tsx`, `docs/internals/terminal.md`, `CHANGELOG.md`.
 
-Blockers before a commit:
+`src/terminal/tab-manager.ts` and `CHANGELOG.md` each also carried another session's
+uncommitted hunk (the `setPaneWorking` removal around line 533; the "Removed yellow lines"
+entry, which turned out to be on `origin/main` already). Only this task's hunks were staged,
+through `git apply --cached` of a filtered patch followed by a pathspec-free `git commit`;
+the peer's working-tree changes were never touched.
 
-- `src/terminal/tab-manager.ts` and `CHANGELOG.md` each carry another session's uncommitted
-  hunk (the `setPaneWorking` removal around line 533; the "Removed yellow lines" entry), so
-  `git commit -- <path>` would sweep them in. Split them with the snapshot-and-restore route
-  before committing.
-- `docs/internals/terminal.md` and `CHANGELOG.md` wording awaits the owner's approval.
+On `origin/main` the full suite is green (`384 passed | 1 skipped`, 5072 tests). One earlier
+run reported `scripts/verify-electron-monaco-smoke-package.test.ts` red; it passes alone and
+passed on the re-run, so it is a full-suite flake, not this change.
+
+Remaining: eye check in the real app.
 
 `src/gallery/sections/quick-agent-board.tsx` still says "Split right · same tab" and was left
 alone: it is a parked study (`45226b4`).
