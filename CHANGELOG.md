@@ -42,6 +42,11 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 
 ### Agents
 
+- **Quick Launch tiles instead of stacking columns.** A launched agent now splits the
+  [roomiest pane](src/lib/pane-tiling.ts) of the tab along its longer side, so the second,
+  third and fourth agent fill the tab evenly instead of halving one pane into ever
+  narrower strips. A divider you dragged yourself still decides where the next pane lands.
+
 - **Removed yellow lines above terminal panes.** The [pane overlays](src/styles/06-stage-panes.css)
   no longer animate while agents work or when selecting an agent from the sidebar.
   Agent status indicators and pane navigation keep their existing behavior.

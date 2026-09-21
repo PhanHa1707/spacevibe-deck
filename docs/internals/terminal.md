@@ -145,6 +145,14 @@ checkout tab, then an exact root, then a matching nested tab; another worktree i
 fallback. Windows path keys are comparison-only. Split launches require a fresh known
 cwd; unavailable cwd does not fall back to home.
 
+The captured target decides the FOLDER, not the slot: the pane goes where
+[pane tiling](../../src/lib/pane-tiling.ts) puts it — the tab's roomiest leaf, split along
+its longer side — so repeated launches tile instead of halving one pane into ever narrower
+columns. It reads the structural ratios rather than the Focus Expand overlay, so a divider
+dragged by hand still decides where the next agent lands, and it measures the shared stage
+host because a background tab's own container is hidden. No eligible leaf falls back to the
+captured pane's right edge.
+
 [TabManager](../../src/terminal/tab-manager.ts) validates the request before insertion.
 [TerminalManager](../../src/terminal/terminal-manager.ts) discards only newly spawned
 resources if cancellation, disposal or transfer invalidates that operation. Registration

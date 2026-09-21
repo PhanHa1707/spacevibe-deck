@@ -11,6 +11,7 @@ import type { UnlistenFn } from "../host/bridge";
 import { clampFontSize, DEFAULT_SETTINGS } from "../settings/settings-schema";
 import { settings, revealDockTab, toggleDock, updateSettings } from "../settings/settings-store";
 import { type Direction, type Edge, type SerializedNode } from "../lib/split-tree";
+import { chooseTilePlacement, type TilePlacement, type TileViewport } from "../lib/pane-tiling";
 import {
   explicitAgent,
   processLabel,
@@ -1383,6 +1384,29 @@ export function createTabManager(
         );
   }
 
+  /**
+   * Stage box, for the one decision that needs real proportions: which side of
+   * a pane is its longer one. The tab's own container is `display: none` while
+   * it sits in the background, so the shared stage host is read instead — and
+   * `window` covers a host that has not been laid out yet (jsdom, first paint).
+   */
+  function stageViewport(): TileViewport {
+    const rect = host.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0
+      ? { width: rect.width, height: rect.height }
+      : { width: window.innerWidth, height: window.innerHeight };
+  }
+
+  /** Balanced slot for the next launcher pane in `owner`; null → caller's default. */
+  function tilePlacementIn(owner: TabEntry): TilePlacement | null {
+    const layout = owner.manager.serializeLayout();
+    return layout === null
+      ? null
+      : chooseTilePlacement(layout, owner.manager.paneIds(), stageViewport(), (id) =>
+          owner.manager.isPaneLaunchable(id),
+        );
+  }
+
   async function createPageLaunchPane(
     target: AgentLaunchTarget,
     canCommit: () => boolean,
@@ -1424,11 +1448,20 @@ export function createTabManager(
     const cwd = await freshCwd(target.paneId, pty);
     if (!valid()) return null;
     if (!cwd?.trim()) throw new LaunchPageMessage("Could not read the target folder. Try again.");
-    const id = await owner.manager.dockNewPaneAt(target.paneId, "right", {
-      cwd,
-      focus: false,
-      canCommit: valid,
-    });
+    // The captured target decides the FOLDER; the tab's geometry decides the
+    // slot. Anchoring both on the active pane is what stacked every launch
+    // into narrower columns. Read after the cwd await — the tree can change
+    // while it is in flight.
+    const placement = tilePlacementIn(owner);
+    const id = await owner.manager.dockNewPaneAt(
+      placement?.paneId ?? target.paneId,
+      placement?.edge ?? "right",
+      {
+        cwd,
+        focus: false,
+        canCommit: valid,
+      },
+    );
     return id === null ? null : { owner, paneId: id };
   }
 

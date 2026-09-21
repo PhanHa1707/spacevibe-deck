@@ -64,6 +64,39 @@ describe("explicit agent launch target", () => {
     tm.dispose();
   });
 
+  it("tiles the second agent into the roomiest pane instead of another column", async () => {
+    const pty = createMemoryPtyClient({
+      nextId: 1,
+      infos: new Map(
+        [1, 2, 3].map((id) => [id, processInfo(id, "/repo", "zsh", "idle-shell", null)]),
+      ),
+    });
+    const { tm } = wire(pty);
+    await tm.openQuickAgent(null, "/repo");
+    for (const _ of [0, 1]) {
+      const target = tm.captureAgentLaunchTarget("/repo")!;
+      expect((await tm.launchAgentAtTarget(target, "claude", () => true)).kind).toBe("spawned");
+    }
+    // Leaf order, not spawn order: pane 3 landed UNDER pane 1.
+    expect(tm.allPaneIds()).toEqual([1, 3, 2]);
+    // Columns only for the first split; the second cuts the left column across
+    // (jsdom's 1024x768 window stands in for the stage).
+    expect((await tm.captureActiveLayout())?.layout).toEqual({
+      type: "split",
+      direction: "row",
+      ratio: 0.5,
+      first: {
+        type: "split",
+        direction: "column",
+        ratio: 0.5,
+        first: { type: "leaf" },
+        second: { type: "leaf" },
+      },
+      second: { type: "leaf" },
+    });
+    tm.dispose();
+  });
+
   it("rejects a captured destination later identified as another checkout", async () => {
     const pty = createMemoryPtyClient({ nextId: 1 });
     const { tm } = wire(pty);

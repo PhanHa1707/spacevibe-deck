@@ -62,12 +62,12 @@ export function AgentLaunchPage(props: AgentLaunchPageProps) {
           <span
             title={
               props.target.kind === "split"
-                ? `Beside pane ${props.target.paneId}`
+                ? `Splits the roomiest pane in the tab holding pane ${props.target.paneId}`
                 : props.target.workspacePath
             }
           >
             <DeckIcon icon={Columns} size={14} />
-            {props.target.kind === "split" ? "Split right · same tab" : "New tab"}
+            {props.target.kind === "split" ? "Split · same tab" : "New tab"}
           </span>
         </div>
         {!props.resolved ? <p role="status">Looking for installed agents…</p> : null}
