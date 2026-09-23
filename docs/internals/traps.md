@@ -37,6 +37,11 @@ constants that currently switch behaviour off and are meant to be flipped back.
 - **Props on the element `DesktopChrome` returns are applied on mount and never updated.**
   The sidebar's live width and collapsed flag are written to `:root` imperatively to
   sidestep it.
+- **A pane's terminal never goes below 24x6, even when its box does.** opencode 1.18.31 stops
+  painting for good once its pty drops to 20 columns or fewer, also under tmux, and Deck
+  panes get that narrow easily. [`fit()`](../../src/terminal/pane.ts) clamps the size there,
+  so the extra columns clip at the pane's right edge. Replacing it with `fitAddon.fit()`
+  brings the agent death back.
 
 ## Hosts and evidence
 

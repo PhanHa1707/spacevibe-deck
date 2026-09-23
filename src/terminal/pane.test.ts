@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "preact/test-utils";
 import { tabViews } from "./tabs-store";
+import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, type Settings } from "../settings/settings-schema";
@@ -135,6 +136,31 @@ describe("Claude header input routing", () => {
       tabViews.value = [];
       focus.mockRestore();
       vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe("Pane column floor", () => {
+  it("never resizes the terminal below 24x6, however small the box measures", () => {
+    const propose = vi
+      .spyOn(FitAddon.prototype, "proposeDimensions")
+      .mockReturnValue({ cols: 18, rows: 3 });
+    const resize = vi.spyOn(Terminal.prototype, "resize");
+    const pane = createPane(30, DEFAULT_SETTINGS as Settings, silentEvents, {
+      cols: 101,
+      rows: 16,
+    });
+    try {
+      pane.fit();
+      expect(resize).toHaveBeenLastCalledWith(24, 6);
+      expect(pane.cols).toBe(24);
+      propose.mockReturnValue({ cols: 90, rows: 30 });
+      pane.fit();
+      expect(resize).toHaveBeenLastCalledWith(90, 30);
+    } finally {
+      pane.dispose();
+      propose.mockRestore();
+      resize.mockRestore();
     }
   });
 });
