@@ -141,7 +141,7 @@ describe("Claude header input routing", () => {
 });
 
 describe("Pane column floor", () => {
-  it("never resizes the terminal below 24x6, however small the box measures", () => {
+  it("never resizes the terminal below 24 columns, however narrow the box measures", () => {
     const propose = vi
       .spyOn(FitAddon.prototype, "proposeDimensions")
       .mockReturnValue({ cols: 18, rows: 3 });
@@ -152,8 +152,11 @@ describe("Pane column floor", () => {
     });
     try {
       pane.fit();
-      expect(resize).toHaveBeenLastCalledWith(24, 6);
+      expect(resize).toHaveBeenLastCalledWith(24, 3);
       expect(pane.cols).toBe(24);
+      propose.mockReturnValue({ cols: 18, rows: 1 });
+      pane.fit();
+      expect(resize).toHaveBeenLastCalledWith(24, 1);
       propose.mockReturnValue({ cols: 90, rows: 30 });
       pane.fit();
       expect(resize).toHaveBeenLastCalledWith(90, 30);

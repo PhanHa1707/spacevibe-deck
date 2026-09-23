@@ -34,7 +34,7 @@ card, and fixes agents that stopped drawing in narrow panes.
   narrower strips. A divider you dragged yourself still decides where the next pane lands.
 
 - **Agents keep drawing in narrow panes.** A terminal never shrinks below 24
-  columns and 6 rows; a narrower pane [clips its right edge](src/terminal/pane.ts)
+  columns; a narrower pane [clips its right edge](src/terminal/pane.ts)
   instead. OpenCode stopped drawing for good once its pane reached 20 columns
   or fewer, even after the pane grew back.
 

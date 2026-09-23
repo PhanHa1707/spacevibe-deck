@@ -453,15 +453,16 @@ export function createPane(
     fit();
   }
 
-  // A floor for the terminal size, below whatever the pane box measures.
+  // A floor for the terminal width, below whatever the pane box measures.
   // opencode 1.18.31 stops painting for good once its pty is resized to 20
   // columns or fewer (measured 2026-09-21: 21–25 repaint, 18–20 go silent,
   // also under tmux), and Deck panes reach that width easily. Clamping here,
   // where every dock, split, divider drag, window resize and restore lands,
   // keeps xterm and the pty equal; a narrower pane clips its right edge
-  // through `.pane { overflow: hidden }` instead of wrapping.
+  // through `.pane { overflow: hidden }` instead of wrapping. Rows get no
+  // floor on purpose: nothing measured one, and a floor taller than the box
+  // clips the bottom rows, where an agent keeps its live prompt.
   const MIN_TERMINAL_COLS = 24;
-  const MIN_TERMINAL_ROWS = 6;
 
   function fit(): void {
     try {
@@ -471,7 +472,7 @@ export function createPane(
       const proposed = fitAddon.proposeDimensions();
       if (!proposed || Number.isNaN(proposed.cols) || Number.isNaN(proposed.rows)) return;
       const cols = Math.max(MIN_TERMINAL_COLS, proposed.cols);
-      const rows = Math.max(MIN_TERMINAL_ROWS, proposed.rows);
+      const rows = proposed.rows;
       if (cols !== term.cols || rows !== term.rows) {
         term.resize(cols, rows);
       }
