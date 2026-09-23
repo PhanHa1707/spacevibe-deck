@@ -843,8 +843,7 @@ describe("WorktreeCard host parity — no gate (review reversal, 2026-08-26)", (
   // round 2 reversed it on the SAME reviewer's own follow-up, once the
   // `FlatPanes` consequence was named (see the file's top-of-module
   // comment). `WorktreeCardProps` carries no such field any more — these
-  // pin that a card's strip and its open-list rows draw unconditionally,
-  // on both the labelled and the unlabelled (`FlatPanes`) path.
+  // pin that a card's strip and its open-list rows draw unconditionally.
 
   it("draws the closed strip regardless of host", () => {
     mount({
@@ -860,18 +859,6 @@ describe("WorktreeCard host parity — no gate (review reversal, 2026-08-26)", (
     mount({
       open: true,
       group: group({ age: "5m", panes: [pane({ paneId: 1 }), pane({ paneId: 2 })] }),
-    });
-
-    expect(host.querySelectorAll(".asr-card__row")).toHaveLength(2);
-  });
-
-  it("draws FlatPanes' rows regardless of host — the dominant real-Tauri path", () => {
-    // `git_repository` is Electron-only, so under REAL Tauri almost every
-    // checkout is unlabelled and renders through here, not through a card
-    // at all. A gate scoped to the labelled path alone would have left this
-    // branch — the one that matters in practice — untouched either way.
-    mount({
-      group: group({ labelled: false, panes: [pane({ paneId: 1 }), pane({ paneId: 2 })] }),
     });
 
     expect(host.querySelectorAll(".asr-card__row")).toHaveLength(2);
@@ -980,18 +967,44 @@ describe("WorktreeCard shell rows", () => {
   });
 });
 
-describe("WorktreeCard unlabelled checkout", () => {
-  it("renders panes with no card box for a project git does not know", () => {
-    // `labelled: false` is the synthetic worktree of a plain folder or a
-    // Tauri host: the cluster header above already names it.
-    mount({
-      open: true,
-      group: group({ labelled: false, panes: [pane({ paneId: 1 }), pane({ paneId: 2 })] }),
+describe("WorktreeCard folder git does not know (DL-27.23, amended 2026-09-23)", () => {
+  // `labelled: false` is the synthetic worktree of a plain folder: primary,
+  // named after the folder, with the basename standing in for a branch.
+  const folder = (overrides: Partial<RailWorktreeGroup> = {}): RailWorktreeGroup =>
+    group({
+      key: "/w/scratch",
+      name: "scratch",
+      branch: "scratch",
+      path: "/w/scratch",
+      repositoryPath: "/w/scratch",
+      primary: true,
+      labelled: false,
+      ...overrides,
     });
 
-    expect(host.querySelector(".asr-card")).toBeNull();
-    expect(host.querySelector(".asr-bare")).toBeNull();
+  it("renders the same card as a checkout, badged Folder", () => {
+    mount({
+      project: "scratch",
+      open: true,
+      group: folder({ panes: [pane({ paneId: 1 }), pane({ paneId: 2 })] }),
+    });
+
+    const card = host.querySelector(".asr-card");
+    expect(card).not.toBeNull();
+    expect(card?.querySelector(".asr-card__name")?.textContent).toBe("scratch");
+    const badge = card?.querySelector(".asr-card__badge");
+    expect(badge?.getAttribute("data-kind")).toBe("role");
+    expect(badge?.textContent).toBe("Folder");
     expect(host.querySelectorAll(".asr-card__row")).toHaveLength(2);
+  });
+
+  it("renders the bare row when nothing is open in it", () => {
+    mount({ project: "scratch", group: folder() });
+
+    expect(host.querySelector(".asr-card")).toBeNull();
+    const bare = host.querySelector(".asr-bare");
+    expect(bare?.querySelector(".asr-bare__name")?.textContent).toBe("scratch");
+    expect(bare?.querySelector(".asr-bare__badge")?.textContent).toBe("Folder");
   });
 });
 
@@ -1020,18 +1033,23 @@ describe("agent launcher create controls", () => {
     },
   );
 
-  // The flat shape has no `.asr-card` to right-click, so before the create row
-  // carried the gesture this path lost every pointer route to `Open shell`.
+  // A folder git does not know takes the card since DL-27.23's 2026-09-23
+  // amendment, so the card's own right-click is its pointer route to
+  // `Open shell` once the create row opens the launch page.
   it("keeps the actions menu reachable for a folder git does not know", () => {
     const onOpenAgentLauncher = vi.fn();
     const actions = { ...cardActions(), onOpenAgentLauncher };
-    mount({ group: group({ labelled: false, panes: [pane()] }), actions });
-    expect(host.querySelector(".asr-card")).toBeNull();
+    mount({ group: group({ labelled: false, panes: [pane()] }), open: true, actions });
     const row = host.querySelector<HTMLButtonElement>(".asr-card__new")!;
     act(() => row.click());
     expect(onOpenAgentLauncher).toHaveBeenCalledOnce();
     expect(host.querySelector('[role="menu"]')).toBeNull();
-    act(() => void row.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true })));
+    act(
+      () =>
+        void host
+          .querySelector(".asr-card")!
+          .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true })),
+    );
     expect(host.querySelector('[role="menu"]')).not.toBeNull();
     expect(onOpenAgentLauncher).toHaveBeenCalledOnce();
   });

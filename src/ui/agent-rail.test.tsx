@@ -840,7 +840,7 @@ describe("AgentRail worktree groups (DL-27.23/DL-27.24, amended by the card)", (
     expect(branches()).toEqual(["main", "side"]);
   });
 
-  it("prints no card for a folder git does not know", async () => {
+  it("prints a Folder card for a folder git does not know", async () => {
     configureRepositoryClient({
       scan: async () => ({ kind: "plain", reason: "not a git repository" }),
     });
@@ -852,16 +852,16 @@ describe("AgentRail worktree groups (DL-27.23/DL-27.24, amended by the card)", (
     mount({ cardActions: ACTIONS });
     await settle();
 
-    // The one implicit group's only name is the folder the cluster header
-    // above it already prints — which is also every project under Tauri.
-    // Its panes render FLAT (no card, no head, no toggle needed to see them).
-    expect(host.querySelector(".asr-card")).toBeNull();
-    expect(host.querySelector(".asr-bare")).toBeNull();
+    // DL-27.23, amended 2026-09-23: the one implicit group takes the same card
+    // a checkout does, named by the folder and badged `Folder` rather than
+    // `Primary`, so an added folder does not read as a different kind of thing.
+    expect(host.querySelectorAll(".asr-card")).toHaveLength(1);
     expect(host.querySelector(".asr-cluster__head")?.textContent).toBe("main");
+    expect(branches()).toEqual(["main"]);
+    expect(host.querySelector(".asr-card__badge")?.textContent).toBe("Folder");
     expect(rows()).toHaveLength(1);
-    // Its one create control (`rail-create-consolidation`, design D5): with the
-    // header's `+` gone, the flat entries end with the open card's own row,
-    // and the list it raises has no branch to fork from.
+    // Its create control is the open card's own row, and the list it raises
+    // has no branch to fork from.
     expect(host.querySelectorAll(".asr-card__new")).toHaveLength(1);
     expect(host.querySelector(".asr-cluster__add")).toBeNull();
     click(host.querySelector(".asr-card__new"));
@@ -1011,15 +1011,17 @@ describe("AgentRail remembered projects (2026-08-20)", () => {
   it("keeps a remembered project one press from an agent, through its checkout row", async () => {
     // `rail-create-consolidation`: the header's `+` is gone, so a remembered
     // project prints its checkouts as rowless groups and THEY are the way back
-    // in — `/w/other` is a plain folder, so it renders flat entries (none) plus
-    // that tier's `New agent` row, and the list it raises runs there.
+    // in — `/w/other` is a plain folder, so it renders the same bare row a
+    // checkout with nothing open does (badged `Folder`), and the list it raises
+    // runs there.
     mount({ cardActions: ACTIONS });
     await settle();
 
     expect(host.querySelector(".asr-cluster__add")).toBeNull();
     const heads = host.querySelectorAll<HTMLElement>(".asr-cluster__head");
     const remembered = heads[1].closest<HTMLElement>(".asr-cluster");
-    const row = remembered?.querySelector<HTMLElement>(".asr-card__new");
+    const row = remembered?.querySelector<HTMLElement>("button.asr-bare");
+    expect(row?.querySelector(".asr-bare__badge")?.textContent).toBe("Folder");
     expect(row).not.toBeNull();
     // The header itself is still a still label — no toggle, no live close.
     expect(heads[1].querySelector(".asr-cluster__toggle")).toBeNull();

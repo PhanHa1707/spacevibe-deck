@@ -23,12 +23,11 @@
 
 /*
  * Pinned on every card-owned root — `.asr-card` (the boxed shape), `.asr-bare` (a checkout
- * with nothing running) and `.asr-card__row` (redeclared because `FlatPanes` renders agent
- * rows with NO `.asr-card` ancestor at all: a project git does not know, `group.labelled ===
- * false`, is every Tauri checkout today since `git_repository` is Electron-only). Declaring
- * the same values on three roots rather than one shared ancestor is what keeps the Tauri path
- * — a bare row with no card box around it — in sync with the boxed one without inventing a
- * fourth wrapper class nothing renders.
+ * with nothing running) and `.asr-card__row`. The row was redeclared for the flat path a
+ * folder git does not know used to render, with no `.asr-card` ancestor; since DL-27.23's
+ * 2026-09-23 amendment that folder takes a card too, so the production rail no longer draws a
+ * row outside one. The declaration stays so a row mounted on its own still resolves the same
+ * values.
  */
 .asr-card,
 .asr-bare,

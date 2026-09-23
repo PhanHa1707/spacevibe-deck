@@ -2780,8 +2780,13 @@ a 1.5s effect. The ping is the inset hairline DL-1.3 explicitly permits.
   rowless remembered cluster (DL-27.16's amendment, 2026-08-20) one tier down —
   and a worktree the user has never opened in Deck stays invisible: git
   discovery supplies metadata, it does not decide what becomes a row. A project
-  git does not know has ONE implicit group and prints no sub-header, since its
-  only name is the folder name the header above it already said.
+  git does not know has ONE implicit group. **Amended 2026-09-23 (owner):** that
+  group takes the same card and bare row as a checkout, named by the folder and
+  badged `Folder` in `Primary`'s role treatment, where it used to print no
+  sub-header and its agents as flat rows. Adding a folder next to a repository
+  read as two different kinds of workspace; one shape wins over saving the
+  repeated folder name. Only its actions menu still differs: no branch, color
+  or checkout word ([`checkoutBadge`](../src/ui/agent-rail-card-model.ts)).
 - **DL-27.24** **A worktree group is a label, not a control (2026-08-25,
   owner).** It carries its branch and one launcher — the project header's own
   `+` (DL-27.18), `PlusSquare` at 15px, revealed on hover or focus, opening the

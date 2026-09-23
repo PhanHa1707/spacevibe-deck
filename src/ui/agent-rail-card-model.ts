@@ -226,6 +226,12 @@ export function checkoutLabel(group: RailWorktreeGroup): string {
  * when that header came off.
  */
 export function checkoutBadge(group: RailWorktreeGroup): CheckoutBadge {
+  // A folder git does not know is `primary` too (its one synthetic checkout),
+  // but `Primary` would promise a repository behind it. The word says what it
+  // is instead, so a plain folder's card reads as a card, not as a checkout.
+  if (!group.labelled) {
+    return { kind: "role", text: "Folder" };
+  }
   if (group.primary) {
     return { kind: "role", text: "Primary" };
   }

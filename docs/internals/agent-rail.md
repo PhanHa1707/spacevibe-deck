@@ -272,7 +272,8 @@ rather than inheriting a surface whose git and session sources it lacks.
 
 The checkout create controls open the Electron
 [agent launch page](../../src/launcher/agent-launch-page.tsx): the expanded `New agent`
-row, collapsed `+`, bare checkout and flat folder row share this route. A press creates
+row, collapsed `+` and bare checkout share this route; a folder git does not know renders
+the same card and bare row, badged `Folder`. A press creates
 nothing. `Run` splits right beside a captured pane in that checkout, or opens one first
 pane when it has no live tab. The page adds no task-strip item; Back and Escape restore
 the previous surface ([page state](../../src/launcher/agent-launch-page-store.ts)).

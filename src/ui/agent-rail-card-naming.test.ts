@@ -68,6 +68,16 @@ describe("checkoutBadge", () => {
     expect(checkoutBadge(SELF_NAMED)).toEqual({ kind: "worktree", text: "Worktree" });
   });
 
+  it("calls a folder git does not know a Folder, not Primary (DL-27.23, amended)", () => {
+    // The synthetic checkout of a plain folder: primary, basename as branch.
+    const folder = {
+      ...group({ name: "scratch", branch: "scratch", primary: true }),
+      labelled: false,
+    };
+    expect(checkoutLabel(folder)).toBe("scratch");
+    expect(checkoutBadge(folder)).toEqual({ kind: "role", text: "Folder" });
+  });
+
   it("never restates the label it sits beside", () => {
     for (const item of [PRIMARY, WORKTREE, SELF_NAMED]) {
       expect(checkoutBadge(item).text).not.toBe(checkoutLabel(item));

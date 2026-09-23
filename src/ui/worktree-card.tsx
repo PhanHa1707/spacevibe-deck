@@ -66,11 +66,10 @@ import type { RailCardEntry, RailCardShell, RailWorktreeGroup } from "./agent-ra
  * `electronHostAvailable` because a TAB ROW still existed underneath to fall
  * back to. That fallback is gone — the tab tier no longer renders at all —
  * so a gate here could only choose between "pane rows" and "nothing", never
- * restore the old picture. And because `git_repository` is Electron-only,
- * REAL Tauri renders almost entirely through `FlatPanes` (`!group.labelled`
- * below): gating the labelled path alone would have been cosmetic, and
- * gating both would leave Tauri with a cluster header over a blank space —
- * worse than what it draws today.
+ * restore the old picture. (Since then `AgentRail` routes Tauri to the
+ * legacy `RepositoryRail`, so this component mounts on Electron only, and
+ * the flat unlabelled path that argument leaned on is gone with DL-27.23's
+ * 2026-09-23 amendment: a folder git does not know takes the card too.)
  *
  * This is a DELIBERATE, NAMED parity change, not an accident: Tauri gains
  * per-pane rows and a per-pane close it never had before (DL-27.13's tree
@@ -325,84 +324,11 @@ function BareCheckout({
 }
 
 /**
- * A project git does not know (Tauri, or a plain folder): `group.labelled`
- * is false for the ONE synthetic worktree such a project has — the model's
- * own field, unchanged since the worktree-tier spec, meaning "the cluster
- * header above already names this folder, so no card head repeats it". Its
- * entries still need somewhere to render, since the tab tier that used to
- * carry them is gone (spec §3): they print as plain agent/shell rows with no
- * card box, head or toggle around them.
- */
-function FlatEntries({
-  project,
-  group,
-  actions,
-  onFocusPane,
-  onClosePane,
-  onSelectTab,
-  onCloseTab,
-}: {
-  readonly project: string;
-  readonly group: RailWorktreeGroup;
-  readonly actions?: CardActions;
-  readonly onFocusPane: (tabIndex: number, paneId: number) => void;
-  readonly onClosePane: (tabIndex: number, paneId: number) => void;
-  readonly onSelectTab: (tabIndex: number) => void;
-  readonly onCloseTab: (tabIndex: number) => void;
-}) {
-  const menu = useActionsMenu();
-  return (
-    <Fragment>
-      {group.entries.map((entry) => (
-        <CardEntryRow
-          key={entry.kind === "agent" ? entry.paneId : entry.key}
-          project={project}
-          group={group}
-          entry={entry}
-          onFocusPane={onFocusPane}
-          onClosePane={onClosePane}
-          onSelectTab={onSelectTab}
-          onCloseTab={onCloseTab}
-        />
-      ))}
-      {/* The folder's one create control (`rail-create-consolidation`, design
-          D5): with the project header's `+` gone, a folder git does not know
-          would otherwise have NO create path. The same row the open card
-          ends with, anchored to itself since there is no card box; the menu
-          it raises drops every git-backed row (`labelled: false`). A remembered
-          folder with no entries renders this row alone. */}
-      {actions !== undefined && (
-        <Fragment>
-          <NewAgentRow
-            where={whereOf(project, group)}
-            open={menu.rect !== null}
-            opensPage={actions.onOpenAgentLauncher !== undefined}
-            onPress={(row) => {
-              if (actions.onOpenAgentLauncher) {
-                actions.onOpenAgentLauncher(group.path);
-                return;
-              }
-              menu.toggleAt(row.getBoundingClientRect(), row);
-            }}
-            // This shape has no card box to right-click, so the create row is
-            // the anchor. Without it, a folder git does not know loses every
-            // pointer route to `Open shell` once the press opens the launch
-            // page instead of the menu.
-            onContext={(row) => menu.openAt(row.getBoundingClientRect())}
-          />
-          <CheckoutMenu project={project} group={group} actions={actions} menu={menu} />
-        </Fragment>
-      )}
-    </Fragment>
-  );
-}
-
-/**
  * The actions menu's open state and anchor, shared by every shape a checkout
  * renders as (`rail-create-consolidation`, design D3): the boxed card (its
- * strip `+`, its `New agent` row, a right-click), the bare row of a checkout
- * with nothing open, and the flat entries of a folder git does not know. One
- * hook rather than three copies of the same two fields, so the toggle contract
+ * strip `+`, its `New agent` row, a right-click) and the bare row of a
+ * checkout with nothing open. One hook rather than two copies of the same two
+ * fields, so the toggle contract
  * — a second press on the control that opened it CLOSES it, because that
  * control is exempt from `useDismiss`'s outside-press close — is stated once.
  *
@@ -474,9 +400,9 @@ function CheckoutMenu({
 }
 
 /**
- * The `New agent` row — the open card's create control and the flat entries'
- * (design D5). Since `rail-create-consolidation` it OPENS the checkout's agent
- * list rather than spawning a shell: the label said "agent" and the press
+ * The `New agent` row — the open card's create control (design D5). Since
+ * `rail-create-consolidation` it OPENS the checkout's agent list rather than
+ * spawning a shell: the label said "agent" and the press
  * started none. `aria-haspopup`/`aria-expanded` are DL-13.7's (amended) words
  * for a press-to-open trigger. `.asr-card__new` is its own leaf, not
  * `.asr-card__row` (review fix, 2026-08-26): it shares no press target or
@@ -487,13 +413,11 @@ function NewAgentRow({
   open,
   opensPage = false,
   onPress,
-  onContext,
 }: {
   readonly where: string;
   readonly open: boolean;
   readonly opensPage?: boolean;
   readonly onPress: (row: HTMLButtonElement) => void;
-  readonly onContext?: (row: HTMLButtonElement) => void;
 }) {
   return (
     <button
@@ -505,14 +429,6 @@ function NewAgentRow({
       onClick={(event) => {
         onPress(event.currentTarget);
       }}
-      onContextMenu={
-        onContext === undefined
-          ? undefined
-          : (event) => {
-              event.preventDefault();
-              onContext(event.currentTarget);
-            }
-      }
     >
       <span class="asr-card__glyph asr-card__glyph--new" aria-hidden="true">
         <DeckIcon icon={Plus} size={CHROME_ICON} />
@@ -545,7 +461,7 @@ export interface WorktreeCardProps {
    * The checkout's actions menu (spec §8) — since `rail-create-consolidation`
    * the ONE surface every create control on a checkout raises: the closed
    * card's strip `+`, the open card's `New agent` row, the bare row of a
-   * checkout with nothing open, the flat entries' row, and a right-click on
+   * checkout with nothing open, and a right-click on
    * the card. `onNewTabIn` is gone with that change: no press on this card
    * starts a process by itself any more. Omitted where nothing can wire it,
    * which takes every create control with it (DL-19.7) rather than leaving a
@@ -564,20 +480,9 @@ export function WorktreeCard(props: WorktreeCardProps) {
   const menu = useActionsMenu();
   const cardRef = useRef<HTMLElement>(null);
 
-  if (!group.labelled) {
-    return (
-      <FlatEntries
-        project={project}
-        group={group}
-        actions={props.actions}
-        onFocusPane={props.onFocusPane}
-        onClosePane={props.onClosePane}
-        onSelectTab={props.onSelectTab}
-        onCloseTab={props.onCloseTab}
-      />
-    );
-  }
-
+  // A folder git does not know takes the same card and bare row as a checkout
+  // (DL-27.23, amended 2026-09-23): `labelled: false` changes only the badge
+  // word (`checkoutBadge`) and which actions its menu offers, never the shape.
   if (group.entries.length === 0) {
     return <BareCheckout project={project} group={group} actions={props.actions} />;
   }
