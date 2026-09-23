@@ -220,8 +220,18 @@ export function createPane(
     // overviewRulerBorder to the background to kill xterm's white separator
     // hairline, so any border enabled here would be invisible too.
     overviewRuler: { width: 14 },
-    // Smooth wheel scroll (~125ms) feels less jumpy than the default snap.
-    smoothScrollDuration: 125,
+    // 0 — xterm's default — on purpose, after 125ms was reported as an
+    // intermittent stutter. The animation cannot buy smoothness here: the
+    // viewport rounds every frame back to a whole row
+    // (`Math.round(scrollTop / cell.height)`) and nothing translates the
+    // canvas by the remainder, so a duration only spreads the same row steps
+    // across more frames. It is also conditional — the wheel path picks
+    // `setScrollPositionSmooth` over `setScrollPositionNow` only when
+    // `isPhysicalMouseWheel()` scores the last five events as a real wheel,
+    // and a trackpad crosses that threshold whenever its deltas land on round
+    // numbers. One gesture flips between the animated path and the instant
+    // one, which is the stutter. Uniformly instant beats sometimes animated.
+    smoothScrollDuration: 0,
     // No minimumContrastRatio on purpose: it rewrites *every* color, so an
     // agent TUI's deliberately dim grays get pulled up to near-white and the
     // information hierarchy flattens (SGR 2 `dim` stops reading as dim), on
