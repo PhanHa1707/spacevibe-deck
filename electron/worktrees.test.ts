@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { execFile } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { promisify } from "node:util";
@@ -186,6 +186,21 @@ describe("scanRepository", () => {
       } finally {
         await rm(linked, { recursive: true, force: true });
       }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not climb to a repository rooted above the opened folder", async () => {
+    // A folder opened inside someone else's repository is that folder, not the
+    // ancestor: the rail must name it by itself (owner, 2026-09-23).
+    const dir = await mkdtemp(join(tmpdir(), "deck-repo-"));
+    try {
+      await run("git", ["-C", dir, "init", "-q"]);
+      const nested = join(dir, "projects", "scratch");
+      await mkdir(nested, { recursive: true });
+
+      await expect(scanRepository(nested)).resolves.toMatchObject({ kind: "plain" });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

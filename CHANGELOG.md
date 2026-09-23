@@ -26,7 +26,8 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 
 - **Plain folders get a card like a repository.** A workspace that is not a git
   repository now shows the same [sidebar card](src/ui/worktree-card.tsx) as a
-  repository checkout, labelled `Folder`, instead of loose agent rows.
+  repository checkout, labelled `Folder`, instead of loose agent rows. A folder
+  opened inside a larger repository shows its own name, not the repository's.
 
 - **Workspace favicons in the sidebar.** [Project headers](src/ui/agent-rail.tsx)
   show the workspace favicon when available, falling back to the folder icon

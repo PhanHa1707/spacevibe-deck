@@ -20,7 +20,10 @@ grouping rather than regrouping on its own.
   panes with no recognised agent are dropped from a tab's agent rows in `paneRows` and
   nowhere else.
 - **A cluster is a repository, keyed by its `--git-common-dir`,** so every worktree of one
-  repository folds into one cluster. A folder git does not know is a `plain:<path>` cluster.
+  repository folds into one cluster. A folder git does not know is a `plain:<path>` cluster,
+  and so is a folder inside a repository rooted above it: the
+  [scan](../../electron/worktrees.ts) only answers `repository` for a checkout's own root,
+  so an opened folder is never named after an ancestor repository.
   `RailStreamGroup.orderKey` is produced, never derived by stripping a prefix off `key`: it is
   the repository key or `plain:<path>`, and it is what the stored order is written against.
 - **Clusters sit where their oldest tab put them,** then remembered clusters follow: a

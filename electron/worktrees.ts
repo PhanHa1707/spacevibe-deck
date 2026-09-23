@@ -16,6 +16,7 @@
  * worktree path (git's own output) are arguments, never command text.
  */
 import { execFile } from "node:child_process";
+import { realpath } from "node:fs/promises";
 
 /** Seconds git gets before the read is abandoned. Matches `git_branch`. */
 const GIT_TIMEOUT_MS = 4000;
@@ -212,7 +213,18 @@ async function readIdentity(path: string): Promise<{ key: string; root: string }
 }
 
 /**
- * Scan the repository containing `path`. Never rejects.
+ * Whether two paths name one directory. git reports the toplevel with symlinks
+ * resolved (macOS `/var` → `/private/var`), so both sides are resolved first;
+ * a path that cannot be resolved compares as written.
+ */
+async function isSameDirectory(a: string, b: string): Promise<boolean> {
+  const resolve = (path: string): Promise<string> => realpath(path).catch(() => path);
+  const [left, right] = await Promise.all([resolve(a), resolve(b)]);
+  return left === right;
+}
+
+/**
+ * Scan the repository rooted at `path`. Never rejects.
  *
  * Two commands, both bounded (§1.2). The cost is proportional to the number of
  * worktrees, not to the size of any of them, because `worktree list` reads
@@ -226,6 +238,13 @@ export async function scanRepository(path: string): Promise<RepositoryScan> {
   const identity = await readIdentity(path);
   if (identity === null) {
     return { kind: "plain", reason: "not a git repository" };
+  }
+  // git climbs to the nearest repository ABOVE a folder, so a folder opened
+  // inside an unrelated one (`~/Documents/Development/.git` holding every
+  // project) would be named after that ancestor. The rail names what the user
+  // opened (owner, 2026-09-23): only a checkout's own root is a repository.
+  if (!(await isSameDirectory(path, identity.root))) {
+    return { kind: "plain", reason: "inside a repository rooted above it" };
   }
   const listed = await git(path, ["worktree", "list", "--porcelain"]);
   if (listed === null) {
