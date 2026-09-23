@@ -5,6 +5,43 @@ User-facing release notes. The release workflow's `promote` job publishes the
 platform-limitations header), so each section is written for users, reviewed in
 the release PR, and frozen at the tag — never an auto-generated commit list.
 
+## 2.1.0
+
+This update tiles quick-launched agents evenly, gives plain folders a sidebar
+card, and fixes agents that stopped drawing in narrow panes.
+
+### Sidebar
+
+- **Plain folders get a card like a repository.** A workspace that is not a git
+  repository now shows the same [sidebar card](src/ui/worktree-card.tsx) as a
+  repository checkout, labelled `Folder`, instead of loose agent rows. A folder
+  opened inside a larger repository shows its own name, not the repository's.
+
+- Removed the `Needs me` count button above the
+  [sidebar project list](src/ui/agent-rail.tsx). Each agent still shows its own
+  status, and the Agent Board's Needs me filter is unchanged.
+
+- **Claude Code limits show in every copy of Deck.** The
+  [limit collector](electron/agent-limits/claude-reader.ts) is now shared, so a
+  second Deck install no longer shows a dash while another one owns Claude's
+  status line. Your own status line command is still preserved.
+
+### Agents
+
+- **Quick Launch tiles instead of stacking columns.** A launched agent now splits the
+  [roomiest pane](src/lib/pane-tiling.ts) of the tab along its longer side, so the second,
+  third and fourth agent fill the tab evenly instead of halving one pane into ever
+  narrower strips. A divider you dragged yourself still decides where the next pane lands.
+
+- **Agents keep drawing in narrow panes.** A terminal never shrinks below 24
+  columns and 6 rows; a narrower pane [clips its right edge](src/terminal/pane.ts)
+  instead. OpenCode stopped drawing for good once its pane reached 20 columns
+  or fewer, even after the pane grew back.
+
+- **Trackpad scrolling in terminals no longer stutters.** Terminal scrolling
+  is now instant, instead of switching between animated and instant scrolling
+  in the middle of a gesture.
+
 ## 2.0.0
 
 ### Feedback
@@ -24,11 +61,6 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
 
 ### Sidebar
 
-- **Plain folders get a card like a repository.** A workspace that is not a git
-  repository now shows the same [sidebar card](src/ui/worktree-card.tsx) as a
-  repository checkout, labelled `Folder`, instead of loose agent rows. A folder
-  opened inside a larger repository shows its own name, not the repository's.
-
 - **Workspace favicons in the sidebar.** [Project headers](src/ui/agent-rail.tsx)
   show the workspace favicon when available, falling back to the folder icon
   when the image is missing or cannot be displayed.
@@ -46,11 +78,6 @@ the release PR, and frozen at the tag — never an auto-generated commit list.
   Missing or expired readings show a dash.
 
 ### Agents
-
-- **Quick Launch tiles instead of stacking columns.** A launched agent now splits the
-  [roomiest pane](src/lib/pane-tiling.ts) of the tab along its longer side, so the second,
-  third and fourth agent fill the tab evenly instead of halving one pane into ever
-  narrower strips. A divider you dragged yourself still decides where the next pane lands.
 
 - **Removed yellow lines above terminal panes.** The [pane overlays](src/styles/06-stage-panes.css)
   no longer animate while agents work or when selecting an agent from the sidebar.
