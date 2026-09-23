@@ -2924,50 +2924,21 @@ a 1.5s effect. The ping is the inset hairline DL-1.3 explicitly permits.
   ([head styles](../src/styles/04c-rail-worktree-card.css)); the bare row
   keeps 132px.
 
-- **DL-27.26** **One `Needs me N` line above the clusters (2026-09-18, design
-  review L5).** The rail owns the question "which agent needs me" and answers
-  it once, at the top: a count of the panes in `asked` or `failed` across every
-  card, folded or not, drawn only while it is above zero. Pressing it runs the
-  same preflight as ⌘⇧A (`focus-next-attention`) and lands on the loudest
-  pane. It is a flat pill in the Board bar's chip vocabulary (DL-34.11): a
-  `--status-unread` wash inside DL-1.3's inset hairline, the count at
-  `--text-primary` 620 and the label at `--text-muted`, sharing the cluster
-  header's 7px inset. Strip glyphs keep their corner marks (DL-27.3) and never
-  carry a count; the Board bar's own `Needs me` filter (DL-34.11) is the same
-  figure on the other surface. Rendered as a still `<span>` where nothing
-  wires the focus (DL-19.7). [Rail styles](../src/styles/04a-agent-rail.css),
-  [`AgentRail`](../src/ui/agent-rail.tsx).
+- **DL-27.26** **No aggregate attention button in the sidebar (2026-09-21).**
+  The owner removed the `Needs me N` line above the project clusters from
+  [`AgentRail`](../src/ui/agent-rail.tsx). Per-agent status indicators and the
+  [Board bar](../src/ui/agent-board-bar.tsx) remain available.
 
-  **Amended 2026-09-02 (owner, `openspec/changes/rail-create-consolidation`):
-  every checkout carries exactly ONE create control, and it opens the agent
-  list.** The open card's `New agent` row and the bare row of a checkout with
-  nothing open had spawned a plain SHELL through `onNewTabIn` — a process
-  started without a word about its agent or its place, under a label that said
-  "agent". Both open the checkout's actions menu now, anchored to the card or
-  row, exactly as the closed strip's `+` and a right-click do
-  ([`useActionsMenu`](../src/ui/worktree-card.tsx) `current` is the one state
-  all three shapes share); a press starts nothing, and selecting an agent
-  starts it. Agent rows show only the agent name, without a `Run` prefix. A folder git does not know (flat entries) ends with the same
-  `New agent` row, and its menu drops every git-backed row. A REMEMBERED
-  project prints its remembered checkouts as rowless groups
-  ([`rememberedWorktrees`](../src/ui/agent-rail-model.ts) `current`) so their
-  bare rows are its way back in, since the header's `+` (DL-27.18, retired) is
-  gone. `Open shell` opens a new shell tab even in a busy checkout;
-  `New split here` opens a pane beside the existing tab and materializes a tab
-  when the checkout has none. Both use the checkout named by the menu
-  ([menu callbacks](../src/ui/app.tsx), [tab creation](../src/terminal/tab-manager.ts)).
-  **The menu's heading returns for ONE placement:** raised by `⌘T` with no card
-  beside it, the same `CardActionsMenu` stands free under the stage strip
-  (DL-13.7, amended) and prints the composed destination
-  ([`subjectWhere`](../src/ui/agent-rail-card-model.ts) `current` — `whereOf`'s
-  own words) as one line, `.asr-act__where`, in title ink on the title rung;
-  never the `Actions for` / `Runs in` pair that came off on 2026-08-30. That
-  placement alone also carries `Open another project…`, because with the tab
-  strip's `+` gone, top-tab mode and a hidden sidebar have no other route to
-  the Open board. The menu reads a
-  [`MenuSubject`](../src/ui/agent-rail-card-model.ts) `current` rather than a
-  card's group, so the chord and the card build it from different inputs and
-  name one checkout with one set of words.
+  **Checkout creation (2026-09-18, DECK-27):** the open `New agent` row,
+  collapsed strip `+`, bare checkout and flat folder row open the compact
+  full-page agent launcher on Electron. Opening creates nothing; `Run` splits
+  beside its captured target or creates a first pane when none exists.
+  [Create controls](../src/ui/worktree-card.tsx) omit menu ARIA on this route.
+  Right-click retains the checkout actions menu and its new-tab agent launches,
+  `Open shell` and `New split here`. Tauri retains the menu fallback.
+  Cmd/Ctrl+T uses the page when it has workspace context and the Open board
+  otherwise ([entry routing](../src/ui/app.tsx)). The legacy free-standing menu
+  still states its destination through [MenuSubject](../src/ui/agent-rail-card-model.ts).
 
 ## 28. The rail's action footer
 

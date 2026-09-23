@@ -72,8 +72,7 @@ export interface AgentRailProps {
     /**
      * Focus the pane that needs the user. With an index it targets that tab
      * (the legacy rail's rows); without one it is ⌘⇧A's own preflight and
-     * picks the loudest pane in the window, which is what the card rail's
-     * `Needs me` line presses (DL-27.26).
+     * picks the loudest pane in the window.
      */
     readonly onFocusAttention?: (index?: number) => void;
   };
@@ -307,17 +306,6 @@ function WorktreeCardRail(props: AgentRailProps) {
     foldedCardKeys.value = next;
   }
 
-  // DL-27.26: how many panes are waiting on the user right now — the two
-  // states ⌘⇧A answers, `asked` and `failed` — counted over every card the
-  // rail draws, folded or not. Zero draws nothing: the line exists to be
-  // loud when something is, and a permanent `Needs me 0` would be chrome
-  // that speaks while nobody needs anything.
-  const needsMe = view.stream
-    .flatMap((group) => group.worktrees)
-    .flatMap((worktree) => worktree.panes)
-    .filter((pane) => pane.state === "asked" || pane.state === "failed").length;
-  const onNeedsMe = props.legacy.onFocusAttention;
-
   return (
     <nav class="asr-rail asr-rail--mounted" aria-label="Agents">
       <div class="sidebar-launcher">
@@ -331,36 +319,6 @@ function WorktreeCardRail(props: AgentRailProps) {
           pinned to the bottom of the column, which is the split `.wsbar__list`
           drew before this rail replaced it. */}
       <div class="asr-rail__list" ref={listRef}>
-        {/* The `Needs me N` line (DL-27.26, 2026-09-18): one count above the
-            clusters, pressing it runs ⌘⇧A. Before it, "which agent needs me"
-            was a 4px corner badge on a strip glyph and nothing in the rail
-            said how many. Omitted rather than inert when nothing wires the
-            focus (the gallery, DL-19.7) — then it is a still count. Outside
-            `.asr-stream` on purpose: the drag controller resolves clusters
-            against the stream's children. */}
-        {needsMe > 0 && (
-          <div class="asr-needs">
-            {onNeedsMe === undefined ? (
-              <span class="asr-needs__chip">
-                <span>Needs me</span>
-                <span class="asr-needs__count">{needsMe}</span>
-              </span>
-            ) : (
-              <button
-                type="button"
-                class="asr-needs__chip"
-                aria-label={`${needsMe} ${needsMe === 1 ? "agent needs" : "agents need"} you — focus the next one`}
-                title="Focus the next agent that needs you"
-                onClick={() => {
-                  onNeedsMe();
-                }}
-              >
-                <span>Needs me</span>
-                <span class="asr-needs__count">{needsMe}</span>
-              </button>
-            )}
-          </div>
-        )}
         <section class="asr-stream" aria-label="Open agents">
           {view.stream.map((group) => {
             const collapsed = collapsedGroupKeys.value.has(group.key);

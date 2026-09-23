@@ -9,7 +9,7 @@ describe("shared agent limit service", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const secret = "synthetic-sensitive-setting";
     const service = createAgentLimitsService({
-      userData: "/unused",
+      appData: "/unused",
       executable: "/unused",
       readCodex: async () => absentLimits("codex"),
       connectClaude: async () => {
@@ -26,7 +26,7 @@ describe("shared agent limit service", () => {
     const readCodex = vi.fn(async () => absentLimits("codex"));
     const connectClaude = vi.fn(async () => undefined);
     const service = createAgentLimitsService({
-      userData: "/unused",
+      appData: "/unused",
       executable: "/unused",
       now: () => now,
       readCodex,
@@ -46,7 +46,7 @@ describe("shared agent limit service", () => {
   it("fails closed on a failed account refresh and leaves the other provider readable", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const service = createAgentLimitsService({
-      userData: "/unused",
+      appData: "/unused",
       executable: "/unused",
       readCodex: async () => {
         throw new Error("signed out");

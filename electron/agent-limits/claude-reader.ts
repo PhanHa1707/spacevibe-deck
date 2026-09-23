@@ -34,7 +34,31 @@ async function optionalJson(file: string): Promise<unknown> {
   }
 }
 
-/** Wrap exactly the current command and retain all other status-line options/settings. */
+// The tail every wrapper below has carried since the first release: the user's
+// own command, shell-quoted, or `:` when there was none.
+const WRAPPER_FALLBACK = /; else sh -c ((?:'[^']*'|\\')+); fi$/;
+
+/**
+ * The command a Deck wrapper stands in front of: `null` when the user had no
+ * status line, `undefined` when `command` is not a Deck wrapper. Read from
+ * the wrapper itself rather than a manifest because the wrapper may belong to
+ * another Deck install (a dev build, an older release keyed to its own
+ * userData) whose manifest this one cannot find.
+ */
+function wrappedCommand(command: unknown): string | null | undefined {
+  if (typeof command !== "string" || !command.startsWith("if [ -x ") || !command.includes(SCRIPT))
+    return undefined;
+  const quoted = WRAPPER_FALLBACK.exec(command)?.[1];
+  if (quoted === undefined) return undefined;
+  const unquoted = quoted.replace(/'([^']*)'|\\'/g, (_match, inner?: string) => inner ?? "'");
+  return unquoted === ":" ? null : unquoted;
+}
+
+/**
+ * Wrap the user's command and retain all other status-line options/settings.
+ * The last Deck install to start owns the wrapper: it re-wraps any Deck
+ * wrapper with its own executable, and every install reads the same captures.
+ */
 export async function installClaudeLimitCollector(options: ClaudeLimitOptions): Promise<void> {
   const script = path.join(options.directory, SCRIPT);
   const manifestFile = path.join(options.directory, MANIFEST);
@@ -42,19 +66,20 @@ export async function installClaudeLimitCollector(options: ClaudeLimitOptions): 
   await updateClaudeUserSettings(
     options.settingsPath ?? claudeUserSettingsPath(),
     async (document) => {
-      const saved = limitRecord(await optionalJson(manifestFile));
       const current = limitRecord(document.statusLine);
-      const owned = saved && current?.command === saved.installedCommand;
-      const original = owned ? saved.original : (document.statusLine ?? null);
+      const wrapped = wrappedCommand(current?.command);
+      const original =
+        wrapped === undefined
+          ? (document.statusLine ?? null)
+          : wrapped === null
+            ? null
+            : { ...current, command: wrapped };
       const status = limitRecord(original);
       if (
         original !== null &&
         (!status || status.type !== "command" || typeof status.command !== "string")
       ) {
         throw new Error("Unsupported Claude status line; settings were not changed.");
-      }
-      if (!owned && typeof current?.command === "string" && current.command.includes(SCRIPT)) {
-        throw new Error("Another Deck installation owns this Claude status line.");
       }
       const executable = shellQuote(options.executable);
       const run = `ELECTRON_RUN_AS_NODE=1 ${executable} ${shellQuote(script)} ${shellQuote(String(status?.command ?? ""))}`;
@@ -67,7 +92,7 @@ export async function installClaudeLimitCollector(options: ClaudeLimitOptions): 
       return {
         ...document,
         statusLine: {
-          ...((owned ? current : status) ?? {}),
+          ...(current ?? {}),
           type: "command",
           command: installedCommand,
         },

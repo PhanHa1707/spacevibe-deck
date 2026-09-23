@@ -220,8 +220,18 @@ export function createPane(
     // overviewRulerBorder to the background to kill xterm's white separator
     // hairline, so any border enabled here would be invisible too.
     overviewRuler: { width: 14 },
-    // Smooth wheel scroll (~125ms) feels less jumpy than the default snap.
-    smoothScrollDuration: 125,
+    // 0 — xterm's default — on purpose, after 125ms was reported as an
+    // intermittent stutter. The animation cannot buy smoothness here: the
+    // viewport rounds every frame back to a whole row
+    // (`Math.round(scrollTop / cell.height)`) and nothing translates the
+    // canvas by the remainder, so a duration only spreads the same row steps
+    // across more frames. It is also conditional — the wheel path picks
+    // `setScrollPositionSmooth` over `setScrollPositionNow` only when
+    // `isPhysicalMouseWheel()` scores the last five events as a real wheel,
+    // and a trackpad crosses that threshold whenever its deltas land on round
+    // numbers. One gesture flips between the animated path and the instant
+    // one, which is the stutter. Uniformly instant beats sometimes animated.
+    smoothScrollDuration: 0,
     // No minimumContrastRatio on purpose: it rewrites *every* color, so an
     // agent TUI's deliberately dim grays get pulled up to near-white and the
     // information hierarchy flattens (SGR 2 `dim` stops reading as dim), on
@@ -443,9 +453,29 @@ export function createPane(
     fit();
   }
 
+  // A floor for the terminal width, below whatever the pane box measures.
+  // opencode 1.18.31 stops painting for good once its pty is resized to 20
+  // columns or fewer (measured 2026-09-21: 21–25 repaint, 18–20 go silent,
+  // also under tmux), and Deck panes reach that width easily. Clamping here,
+  // where every dock, split, divider drag, window resize and restore lands,
+  // keeps xterm and the pty equal; a narrower pane clips its right edge
+  // through `.pane { overflow: hidden }` instead of wrapping. Rows get no
+  // floor on purpose: nothing measured one, and a floor taller than the box
+  // clips the bottom rows, where an agent keeps its live prompt.
+  const MIN_TERMINAL_COLS = 24;
+
   function fit(): void {
     try {
-      fitAddon.fit();
+      // Not `fitAddon.fit()`: it applies the measured size unclamped. Its
+      // private `_renderService.clear()` is skipped too; `term.resize` already
+      // triggers a full refresh.
+      const proposed = fitAddon.proposeDimensions();
+      if (!proposed || Number.isNaN(proposed.cols) || Number.isNaN(proposed.rows)) return;
+      const cols = Math.max(MIN_TERMINAL_COLS, proposed.cols);
+      const rows = proposed.rows;
+      if (cols !== term.cols || rows !== term.rows) {
+        term.resize(cols, rows);
+      }
     } catch {
       // Element not in DOM yet or zero-sized — skip, next fit will succeed
     }

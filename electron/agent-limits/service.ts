@@ -10,7 +10,8 @@ import { installClaudeLimitCollector, readClaudeLimits } from "./claude-reader";
 import { readCodexLimits } from "./codex-reader";
 
 interface LimitsServiceOptions {
-  readonly userData: string;
+  /** The per-user app data root (`app.getPath("appData")`), not one install's userData. */
+  readonly appData: string;
   readonly executable: string;
   readonly now?: () => number;
   readonly readCodex?: (signal: AbortSignal) => Promise<AgentLimitReading>;
@@ -18,11 +19,16 @@ interface LimitsServiceOptions {
   readonly connectClaude?: () => Promise<void>;
 }
 
+const SHARED_LIMITS_DIRECTORY = path.join("SpaceVibe", "agent-limits");
+
 /** One Codex request per minute across windows; Claude consumes local status-line reports. */
 export function createAgentLimitsService(options: LimitsServiceOptions) {
   const now = options.now ?? Date.now;
   const controller = new AbortController();
-  const directory = path.join(options.userData, "agent-limits");
+  // Shared by every Deck install on the account (release, dev build, a second
+  // copy): Claude has one user-level status line, so a collector keyed to one
+  // install's userData left every other install unable to read limits.
+  const directory = path.join(options.appData, SHARED_LIMITS_DIRECTORY);
   let codex = absentLimits("codex");
   let lastCodexAttempt = -Infinity;
   let codexFlight: Promise<AgentLimitReading> | null = null;
