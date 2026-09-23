@@ -33,7 +33,7 @@ export interface RegisterServicesDeps {
 
 export function registerServices(deps: RegisterServicesDeps): void {
   const limits = createAgentLimitsService({
-    userData: app.getPath("userData"),
+    appData: app.getPath("appData"),
     executable: process.execPath,
   });
   ipcMain.handle(CHANNELS.agentLimitsSnapshot, () => limits.snapshot());

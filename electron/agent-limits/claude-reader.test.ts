@@ -112,6 +112,21 @@ describe.skipIf(process.platform === "win32")("Claude status-line collector", ()
     await fs.unlink(path.join(options().directory, "claude-statusline.cjs"));
     expect(await run((await document()).statusLine.command, "still works")).toBe("still works");
   });
+  it("takes over another Deck install's wrapper and keeps the user's own command", async () => {
+    const original = { type: "command", command: `cat; printf %s "it's mine"`, refreshInterval: 5 };
+    await fs.writeFile(options().settingsPath, JSON.stringify({ statusLine: original }));
+    const other = { ...options(), directory: path.join(root, "other-install") };
+    await installClaudeLimitCollector(other);
+    await fs.rm(other.directory, { recursive: true });
+    await installClaudeLimitCollector(options());
+    const command = (await document()).statusLine.command;
+    expect(command).toContain(path.join(options().directory, "claude-statusline.cjs"));
+    expect(command).not.toContain("other-install");
+    expect(await run(command, "passes through")).toBe("passes throughit's mine");
+    await installClaudeLimitCollector(options());
+    await restoreClaudeLimitCollector(options());
+    expect((await document()).statusLine).toEqual(original);
+  });
   it("refuses malformed settings without overwriting them", async () => {
     await fs.writeFile(options().settingsPath, "broken json");
     await expect(installClaudeLimitCollector(options())).rejects.toThrow(SyntaxError);
